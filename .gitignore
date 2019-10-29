@@ -1,0 +1,10 @@
+env.sh
+*.bin
+*.dump
+*.S
+version.txt
+lib/libapp.a
+lib/libuser.a
+!.vscode
+.vscode/*
+!.vscode/tasks.json
