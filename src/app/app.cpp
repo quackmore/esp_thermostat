@@ -48,6 +48,7 @@ void app_init_before_wifi(void)
     temp_control_init();
     cron_init();
     cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read, NULL);
+    cron_add_job(0, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
     cron_add_job(5, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
     cron_add_job(10, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
     cron_add_job(15, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
