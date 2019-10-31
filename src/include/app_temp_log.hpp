@@ -6,18 +6,19 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __APP_HPP__
-#define __APP_HPP__
+#ifndef __APP_TEMP_LOG_HPP__
+#define __APP_TEMP_LOG_HPP__
 
-#include "library_dht.hpp"
-#include "library_max6675.hpp"
+#define DHT_DATA ESPBOT_D2
+#define DHT_TEMP_ID 50000
+#define DHT_HUMI_ID 51000
+#define DHT_BUFFERS 1
 
-void app_init_before_wifi(void);
-void app_init_after_wifi(void);
-void app_deinit_on_wifi_disconnect(void);
-uint32 get_last_reboot_date(void);
+#define TEMP_LOG_LENGTH 32
+#define INVALID_TEMP -500
 
-extern char *app_name;
-extern char *app_release;
+void temp_log_init(void);
+void temp_log_read(void *);
+int get_temp(int idx);
 
 #endif

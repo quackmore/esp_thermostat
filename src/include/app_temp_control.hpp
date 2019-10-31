@@ -6,18 +6,11 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __APP_HPP__
-#define __APP_HPP__
+#ifndef __APP_TEMP_CONTROL_HPP__
+#define __APP_TEMP_CONTROL_HPP__
 
-#include "library_dht.hpp"
-#include "library_max6675.hpp"
+void temp_control_init(void);
 
-void app_init_before_wifi(void);
-void app_init_after_wifi(void);
-void app_deinit_on_wifi_disconnect(void);
-uint32 get_last_reboot_date(void);
-
-extern char *app_name;
-extern char *app_release;
+void temp_control_run(void *);
 
 #endif

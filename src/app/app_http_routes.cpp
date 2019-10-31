@@ -18,16 +18,15 @@ extern "C"
 
 #include "espbot_webserver.hpp"
 #include "espbot_http_routes.hpp"
-#include "app_http_routes.hpp"
-#include "app_logger.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
 #include "espbot_json.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_debug.hpp"
-#include "app.hpp"
 #include "library.hpp"
+#include "app.hpp"
+#include "app_http_routes.hpp"
 
 
 static void api_debug_last_rst(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)

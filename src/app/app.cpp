@@ -19,6 +19,9 @@ extern "C"
 #include "library_dht.hpp"
 #include "app.hpp"
 #include "app_heater.hpp"
+#include "app_temp_log.hpp"
+#include "app_temp_control.hpp"
+#include "app_cron.hpp"
 
 /*
  *  APP_RELEASE is coming from git
@@ -41,6 +44,22 @@ void app_init_before_wifi(void)
     lastRebootTime = 0;
     init_dio_task();
     heater_init();
+    temp_log_init();
+    temp_control_init();
+    cron_init();
+    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read, NULL);
+    cron_add_job(5, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(10, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(15, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(20, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(25, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(30, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(35, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(40, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(45, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(50, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(55, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    // cron_add_job(2, 0, CRON_STAR, CRON_STAR, CRON_STAR, check_ota, NULL);
 }
 
 os_timer_t delay_after_wifi;
@@ -48,11 +67,11 @@ os_timer_t delay_after_wifi;
 // give some time to sntp to setup everything ...
 void app_init_after_wifi_delayed(void)
 {
-    esp_mDns.start(espbot.get_name());
     static bool first_time = true;
     if (first_time)
     {
         lastRebootTime = esp_sntp.get_timestamp();
+        cron_sync();
         first_time = false;
     }
 }

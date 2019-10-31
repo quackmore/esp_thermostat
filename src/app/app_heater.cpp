@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_gpio.hpp"
 #include "app_heater.hpp"
 
-#define HEATER_PIN ESPBOT_D4
+#define HEATER_PIN ESPBOT_D3
 
 static os_timer_t heater_period_timer;
 

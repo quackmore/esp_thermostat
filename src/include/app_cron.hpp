@@ -17,6 +17,8 @@ void cron_init(void);
  */
 void cron_sync(void); 
 
+#define CRON_STAR 0xFF
+
 /*
  * # job definition:
  * # .---------------- minute (0 - 59)
