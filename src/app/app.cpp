@@ -45,21 +45,10 @@ void app_init_before_wifi(void)
     init_dio_task();
     heater_init();
     temp_log_init();
-    temp_control_init();
+    // temp_control_init();
     cron_init();
-    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read, NULL);
-    cron_add_job(0, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(5, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(10, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(15, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(20, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(25, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(30, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(35, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(40, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(45, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(50, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
-    cron_add_job(55, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run, NULL);
+    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read);
+    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run);
     // cron_add_job(2, 0, CRON_STAR, CRON_STAR, CRON_STAR, check_ota, NULL);
 }
 
@@ -72,6 +61,7 @@ void app_init_after_wifi_delayed(void)
     if (first_time)
     {
         lastRebootTime = esp_sntp.get_timestamp();
+        temp_control_init();
         cron_sync();
         first_time = false;
     }

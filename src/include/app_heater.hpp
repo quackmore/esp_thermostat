@@ -11,7 +11,8 @@
 
 void heater_init(void);
 void heater_start(void);
-void heater_start(int period); // will stop after period (milliseconds)
+// void heater_start(int period); // will stop after period (milliseconds)
 void heater_stop(void);
+bool is_heater_on(void);
 
 #endif

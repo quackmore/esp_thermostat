@@ -15,8 +15,9 @@ extern "C"
 #include "esp8266_io.h"
 }
 
-#include "app.hpp"
 #include "espbot_global.hpp"
+#include "app.hpp"
+#include "app_cron.hpp"
 #include "app_temp_log.hpp"
 
 static int temperature_log[TEMP_LOG_LENGTH];
@@ -54,7 +55,7 @@ static void temp_log_read_completed(void *param)
         current_idx = 0;
 }
 
-void temp_log_read(void *param)
+void temp_log_read(struct date *time)
 {
     esplog.all("%s\n", __FUNCTION__);
     esplog.trace("... reading temperature ...\n");

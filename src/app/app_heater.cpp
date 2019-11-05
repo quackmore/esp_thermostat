@@ -20,9 +20,10 @@ extern "C"
 #include "espbot_gpio.hpp"
 #include "app_heater.hpp"
 
-#define HEATER_PIN ESPBOT_D3
+#define HEATER_PIN ESPBOT_D4
 
 static os_timer_t heater_period_timer;
+static bool heater_on;
 
 void heater_init(void)
 {
@@ -31,23 +32,32 @@ void heater_init(void)
     esp_gpio.set(HEATER_PIN, ESPBOT_HIGH);
     os_timer_disarm(&heater_period_timer);
     os_timer_setfn(&heater_period_timer, (os_timer_func_t *)heater_stop, NULL);
+    heater_on = false;
 }
 
 void heater_start(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esp_gpio.set(HEATER_PIN, ESPBOT_LOW);
+    heater_on = true;
 }
 
-void heater_start(int period)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    os_timer_arm(&heater_period_timer, period, 0);
-    esp_gpio.set(HEATER_PIN, ESPBOT_LOW);
-}
+// void heater_start(int period)
+// {
+//     esplog.all("%s\n", __FUNCTION__);
+//     os_timer_arm(&heater_period_timer, period, 0);
+//     esp_gpio.set(HEATER_PIN, ESPBOT_LOW);
+//     heater_on = true;
+// }
 
 void heater_stop(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esp_gpio.set(HEATER_PIN, ESPBOT_HIGH);
+    heater_on = false;
+}
+
+bool is_heater_on(void)
+{
+    return heater_on;
 }

@@ -29,16 +29,6 @@ static os_timer_t heater_period_timer;
 //    os_timer_arm(&heater_period_timer, period, 0);
 //
 
-struct date
-{
-    int year;
-    char month;
-    char day_of_month;
-    char hours;
-    char minutes;
-    char seconds;
-    char day_of_week;
-};
 struct job
 {
     char minutes;
@@ -46,8 +36,7 @@ struct job
     char day_of_month;
     char month;
     char day_of_week;
-    void (*command)(void *);
-    void *param;
+    void (*command)(struct date *);
 };
 
 static os_timer_t cron_timer;
@@ -113,6 +102,7 @@ static int get_month(char *str)
 static void get_current_time(struct date *time)
 {
     uint32 timestamp = esp_sntp.get_timestamp();
+    time->timestamp = timestamp;
     char *timestamp_str = esp_sntp.get_timestr(timestamp);
     esplog.trace("%s date: %s [%d]\n", __FUNCTION__, timestamp_str, timestamp);
     char tmp_str[5];
@@ -169,7 +159,7 @@ static void cron_execute(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     cron_sync();
-    struct date current_time;
+    static struct date current_time;
     get_current_time(&current_time);
     struct job *current_job = job_list->front();
     while (current_job)
@@ -181,7 +171,6 @@ static void cron_execute(void)
         // os_printf("       month: %d\n", current_job->month);
         // os_printf(" day of week: %d\n", current_job->day_of_week);
         // os_printf("     command: %X\n", current_job->command);
-        // os_printf("       param: %s\n", current_job->param);
         if ((current_job->minutes != CRON_STAR) && (current_job->minutes != current_time.minutes))
         {
             current_job = job_list->next();
@@ -207,9 +196,8 @@ static void cron_execute(void)
             current_job = job_list->next();
             continue;
         }
-        os_printf("-----------> executing command\n");
         if (current_job->command)
-            current_job->command(current_job->param);
+            current_job->command(&current_time);
         current_job = job_list->next();
     }
 }
@@ -219,7 +207,7 @@ void cron_init(void)
     esplog.all("%s\n", __FUNCTION__);
     os_timer_disarm(&cron_timer);
     os_timer_setfn(&cron_timer, (os_timer_func_t *)cron_execute, NULL);
-    job_list = new List<struct job>(20);
+    job_list = new List<struct job>(CRON_MAX_JOBS);
 }
 
 /*
@@ -247,8 +235,7 @@ int cron_add_job(char minutes,
                  char day_of_month,
                  char month,
                  char day_of_week,
-                 void (*command)(void *),
-                 void *param)
+                 void (*command)(struct date *))
 {
     esplog.all("%s\n", __FUNCTION__);
     // * # job definition:
@@ -258,7 +245,7 @@ int cron_add_job(char minutes,
     // * # |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
     // * # |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
     // * # |  |  |  |  |
-    // * # *  *  *  *  * funcntion param
+    // * # *  *  *  *  * funcntion
     struct job *new_job = new struct job;
     new_job->minutes = minutes;
     new_job->hours = hours;
@@ -266,7 +253,6 @@ int cron_add_job(char minutes,
     new_job->month = month;
     new_job->day_of_week = day_of_week;
     new_job->command = command;
-    new_job->param = param;
     int result = job_list->push_back(new_job);
     return result;
 }

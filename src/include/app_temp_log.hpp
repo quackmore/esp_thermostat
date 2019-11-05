@@ -18,7 +18,7 @@
 #define INVALID_TEMP -500
 
 void temp_log_init(void);
-void temp_log_read(void *);
+void temp_log_read(struct date *);
 int get_temp(int idx);
 
 #endif
