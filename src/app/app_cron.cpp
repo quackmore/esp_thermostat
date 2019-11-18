@@ -99,7 +99,7 @@ static int get_month(char *str)
     return -1;
 }
 
-static void get_current_time(struct date *time)
+static void state_current_time(struct date *time)
 {
     uint32 timestamp = esp_sntp.get_timestamp();
     time->timestamp = timestamp;
@@ -155,12 +155,18 @@ static void get_current_time(struct date *time)
     // esplog.trace("            day of week: %d\n", time->day_of_week);
 }
 
+static struct date current_time;
+
+struct date *get_current_time(void)
+{
+    return &current_time;
+}
+
 static void cron_execute(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     cron_sync();
-    static struct date current_time;
-    get_current_time(&current_time);
+    state_current_time(&current_time);
     struct job *current_job = job_list->front();
     while (current_job)
     {
@@ -208,6 +214,7 @@ void cron_init(void)
     os_timer_disarm(&cron_timer);
     os_timer_setfn(&cron_timer, (os_timer_func_t *)cron_execute, NULL);
     job_list = new List<struct job>(CRON_MAX_JOBS);
+    os_memset(&current_time, 0, sizeof(struct date));
 }
 
 /*
@@ -218,6 +225,14 @@ void cron_sync(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     uint32 cron_period;
+    bool first_time = true;
+    if (first_time)
+    {
+        // don't wait a full minute before updating the current time
+        // cause a browser could require it for visualization...
+        state_current_time(&current_time);
+        first_time = false;
+    }
     uint32 timestamp = esp_sntp.get_timestamp();
     timestamp = timestamp % 60;
 

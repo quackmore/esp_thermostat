@@ -72,7 +72,7 @@ void app_init_after_wifi(void)
     esp_mDns.start(espbot.get_name());
     os_timer_disarm(&delay_after_wifi);
     os_timer_setfn(&delay_after_wifi, (os_timer_func_t *)app_init_after_wifi_delayed, NULL);
-    os_timer_arm(&delay_after_wifi, 2000, 0);
+    os_timer_arm(&delay_after_wifi, 5000, 0);
 
     static bool first_time = true;
     if (first_time)

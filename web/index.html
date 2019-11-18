@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>ESP_thermostat</title>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="shortcut icon" type="image/png" href="https://img.icons8.com/ios/50/000000/thermometer-automation.png" />
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+
+<body class="bg-secondary  col-sm-6 mx-auto">
+  <div class="card text-center">
+    <div class="card-body col-sm-12">
+      <div id="accordion">
+        <div class="card">
+          <div class="card-header" id="headingOne">
+            <h5 class="mb-0">
+              <button class="btn btn-link" data-toggle="collapse" data-target="#collapseCurrent" aria-expanded="true"
+                aria-controls="collapseCurrent">
+                Current working mode
+              </button>
+            </h5>
+          </div>
+
+          <div id="collapseCurrent" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+            <div class="card-body">
+              <div class="row text-center">
+                <div class="d-inline col-sm-4 h4 my-auto" id="thermo_date">___ 00:00</div>
+                <div class="d-inline col-sm-4 h1 my-auto" id="thermo_temp">--.-</div>
+                <div class="d-inline col-sm-4 h4 my-auto" id="thermo_temp_target">no setpoint</div>
+              </div>
+              <br>
+              <div class="my-auto" id="thermo_heater">heater ---</div>
+              <div class="my-auto" id="thermo_mode">mode ---</div>
+              <div class="my-auto" id="thermo_pwr_off">power off in - minutes</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header" id="headingTwo">
+            <h5 class="mb-0">
+              <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseSettings"
+                aria-expanded="false" aria-controls="collapseSettings">
+                Settings
+              </button>
+            </h5>
+          </div>
+          <div id="collapseSettings" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+            <div class="card-body">
+              <div class="form-group row">
+                <label for="ctrl_mode" class="col-sm-6 col-form-label text-left">Control mode</label>
+                <div class="input-group col-sm-6">
+                  <select class="custom-select" id="ctrl_mode">
+                    <option selected value="0">OFF</option>
+                    <option value="1">MANUAL</option>
+                    <option value="2">AUTO</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group row" id="manual_settings">
+                <label for="cont_cycle" class="col-sm-6 col-form-label text-left">Manual settings</label>
+                <div class="input-group col-sm-6">
+                  <select id="cont_cycle" class="custom-select">
+                    <option selectd value="0">ON</option>
+                    <option value="1">ON/OFF</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group row" id="manual_pulse_on">
+                <label for="cycle_on" class="col-sm-6 col-form-label text-left">Pulse ON [minutes]</label>
+                <div class="input-group col-sm-6">
+                  <input type="number" value="10" min="0" max="1440" step="1" class="form-control" id="cycle_on">
+                </div>
+              </div>
+              <div class="form-group row" id="manual_pulse_off">
+                <label for="cycle_off" class="col-sm-6 col-form-label text-left">Pulse OFF [minutes]</label>
+                <div class="input-group col-sm-6">
+                  <input type="number" value="10" min="0" max="1440" step="1" class="form-control" id="cycle_off">
+                </div>
+              </div>
+              <div class="form-group row" id="auto_setpoint">
+                <label for="setpoint" class="col-sm-6 col-form-label text-left">Setpoint</label>
+                <div class="input-group col-sm-6">
+                  <input type="number" value="10" min="0" max="30" step="0.1" class="form-control" id="setpoint">
+                </div>
+              </div>
+              <div id="power_off_timer">
+                <hr>
+                <div class="form-group row">
+                  <label for="off_timer" class="col-sm-6 col-form-label text-left">Power OFF timer [minutes]</label>
+                  <div class="input-group col-sm-6">
+                    <select id="off_timer_en" class="custom-select">
+                      <option selectd value="0">Disabled</option>
+                      <option value="1">Enabled</option>
+                      <input type="number" value="10" min="0" max="1440" step="1" class="form-control" id="off_timer">
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="mx-auto">
+                  <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
+                    <div class="btn-group mr-2" role="group" aria-label="First group">
+                      <button type="button" class="btn btn-primary" id="settings_reset">Reset</button>
+                    </div>
+                    <div class="btn-group mr-2" role="group" aria-label="Second group">
+                      <button type="button" class="btn btn-primary" id="settings_save">Save</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer text-muted ">
+      <div>By <a href="mailto:quackmore-ff@yahoo.com">Quackmore</a></div>
+      <div><a href="https://icons8.com/icon/7240/thermometer-automation">Thermometer Automation icon by Icons8</a></div>
+    </div>
+  </div>
+  <!-- JavaScript -->
+  <!-- jQuery first, then Popper.js, then Bootstrap JS, then custom script -->
+  <!-- don't use slim if you need ajax -->
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"
+    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+    crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+    crossorigin="anonymous"></script>
+  <script type="module" src="esp_queries.js"></script>
+  <script type="module" src="html_dyn.js"></script>
+</body>
+
+</html>

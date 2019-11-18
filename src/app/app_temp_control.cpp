@@ -30,36 +30,40 @@ static int ctrl_mode; // off/manual/auto
 //
 // heater mngmt
 //
+
 static uint32 last_heater_on;
 static uint32 last_heater_off;
 
 void switch_on_heater(void)
 {
-    last_heater_on = esp_sntp.get_timestamp();
+    esplog.all("%s\n", __FUNCTION__);
+    last_heater_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
     heater_start();
     esplog.debug("TEMP CTRL -> heater on\n");
 }
 
 void switch_off_heater(void)
 {
-    last_heater_off = esp_sntp.get_timestamp();
+    esplog.all("%s\n", __FUNCTION__);
+    last_heater_off = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
     heater_stop();
     esplog.debug("TEMP CTRL -> heater off\n");
 }
 
 //
-// CTRL mngmt
+// MANUAL CTRL
 //
 static struct _manual_ctrl_vars
 {
     int heater_on_period;  // minutes, 0 minutes -> continuos
     int heater_off_period; // minutes
-    uint32 started_on;     // last timestamp when heater was started
+    uint32 started_on;     // the timestamp when manual ctrl was started
     int stop_after;        // minutes
 } manual_ctrl_vars;
 
 void ctrl_off(void)
 {
+    esplog.all("%s\n", __FUNCTION__);
     ctrl_mode = MODE_OFF;
     if (is_heater_on())
         switch_off_heater();
@@ -69,13 +73,31 @@ void ctrl_off(void)
 
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
 {
+    esplog.all("%s\n", __FUNCTION__);
     ctrl_mode = MODE_MANUAL;
     manual_ctrl_vars.heater_on_period = heater_on_period;
     manual_ctrl_vars.heater_off_period = heater_off_period;
     manual_ctrl_vars.stop_after = stop_after;
-    manual_ctrl_vars.started_on = esp_sntp.get_timestamp();
+    manual_ctrl_vars.started_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
     switch_on_heater();
     esplog.debug("TEMP CTRL -> MANUAL MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
+}
+
+static struct _auto_ctrl_vars
+{
+    int setpoint;
+    uint32 started_on;     // the timestamp when auto was started
+    int stop_after;        // power off timer in minutes
+} auto_ctrl_vars;
+
+void ctrl_auto(int set_point, int stop_after)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    ctrl_mode = MODE_AUTO;
+    auto_ctrl_vars.setpoint = set_point;
+    auto_ctrl_vars.stop_after = stop_after;
+    auto_ctrl_vars.started_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
+    esplog.debug("TEMP CTRL -> AUTO MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
 }
 
 void temp_control_init(void)
@@ -126,7 +148,16 @@ void temp_control_manual(struct date *time)
 void temp_control_auto(struct date *time)
 {
     esplog.all("%s\n", __FUNCTION__);
-    esplog.debug("... running auto temperature control\n");
+    // switch off timer management (if enabled)
+    if (auto_ctrl_vars.stop_after > 0)
+    {
+        uint32 running_since = time->timestamp - auto_ctrl_vars.started_on;
+        if (running_since >= (auto_ctrl_vars.stop_after * 60))
+        {
+            ctrl_off();
+            return;
+        }
+    }
 }
 
 void temp_control_run(struct date *time)
@@ -146,6 +177,7 @@ void temp_control_run(struct date *time)
         break;
     case MODE_AUTO:
         temp_control_auto(time);
+        esplog.debug("  started on -> %d %s\n", auto_ctrl_vars.started_on, esp_sntp.get_timestr(auto_ctrl_vars.started_on));
         break;
     default:
         break;
@@ -153,4 +185,40 @@ void temp_control_run(struct date *time)
     esplog.debug("      HEATER -> %d\n", is_heater_on());
     esplog.debug(" switched on -> %d %s\n", last_heater_on, esp_sntp.get_timestr(last_heater_on));
     esplog.debug("switched off -> %d %s\n", last_heater_off, esp_sntp.get_timestr(last_heater_off));
+}
+
+int get_current_mode(void)
+{
+    return ctrl_mode;
+}
+
+int get_pwr_off_timer(void)
+{
+    if (ctrl_mode == MODE_MANUAL)
+        return manual_ctrl_vars.stop_after;
+    if (ctrl_mode == MODE_AUTO)
+        return auto_ctrl_vars.stop_after;
+}
+
+uint32 get_pwr_off_timer_started_on(void)
+{
+    if (ctrl_mode == MODE_MANUAL)
+        return manual_ctrl_vars.started_on;
+    if (ctrl_mode == MODE_AUTO)
+        return auto_ctrl_vars.started_on;
+}
+
+int get_auto_setpoint(void)
+{
+    return auto_ctrl_vars.setpoint;
+}
+
+int get_manual_pulse_on(void)
+{
+    return manual_ctrl_vars.heater_on_period;
+}
+
+int get_manual_pulse_off(void)
+{
+    return manual_ctrl_vars.heater_off_period;
 }

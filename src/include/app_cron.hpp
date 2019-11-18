@@ -49,4 +49,7 @@ void cron_sync(void);
 
 int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(struct date *));
 
+struct date *get_current_time(void);
+
+
 #endif
