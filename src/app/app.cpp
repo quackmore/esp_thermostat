@@ -62,6 +62,14 @@ void app_init_after_wifi_delayed(void)
     {
         lastRebootTime = esp_sntp.get_timestamp();
         temp_control_init();
+
+        // don't wait a full minute before updating
+        // the current time and temperature reading
+        // cause a browser could require it for visualization...
+        init_current_time();
+        init_temperature_readings();
+
+        // sntp is ready now, start cron
         cron_sync();
         first_time = false;
     }

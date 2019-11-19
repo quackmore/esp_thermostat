@@ -31,13 +31,16 @@ static int ctrl_mode; // off/manual/auto
 // heater mngmt
 //
 
-static uint32 last_heater_on;
-static uint32 last_heater_off;
+static struct _heater_vars
+{
+    uint32 last_heater_on;
+    uint32 last_heater_off;
+} heater_vars;
 
 void switch_on_heater(void)
 {
     esplog.all("%s\n", __FUNCTION__);
-    last_heater_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
+    heater_vars.last_heater_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
     heater_start();
     esplog.debug("TEMP CTRL -> heater on\n");
 }
@@ -45,7 +48,7 @@ void switch_on_heater(void)
 void switch_off_heater(void)
 {
     esplog.all("%s\n", __FUNCTION__);
-    last_heater_off = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
+    heater_vars.last_heater_off = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
     heater_stop();
     esplog.debug("TEMP CTRL -> heater off\n");
 }
@@ -86,8 +89,10 @@ void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
 static struct _auto_ctrl_vars
 {
     int setpoint;
-    uint32 started_on;     // the timestamp when auto was started
-    int stop_after;        // power off timer in minutes
+    uint32 started_on; // the timestamp when auto was started
+    int stop_after;    // power off timer in minutes
+    int heater_on_timer;
+    int heater_off_timer;
 } auto_ctrl_vars;
 
 void ctrl_auto(int set_point, int stop_after)
@@ -100,25 +105,34 @@ void ctrl_auto(int set_point, int stop_after)
     esplog.debug("TEMP CTRL -> AUTO MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
 }
 
+void recalculate_auto_ctrl_vars(void)
+{
+    auto_ctrl_vars.heater_on_timer = 2;
+    auto_ctrl_vars.heater_off_timer = 2;
+}
+
 void temp_control_init(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     // heater
-    last_heater_on = 0;
-    last_heater_off = 0;
+    heater_vars.last_heater_on = 0;
+    heater_vars.last_heater_off = 0;
 
     // CTRL
-    ctrl_manual(0, 0, 0);
+    recalculate_auto_ctrl_vars();
+    ctrl_off();
     // COMPLETE_ME: load ctrl_mode from flash
 }
 
-void temp_control_manual(struct date *time)
+void temp_control_manual(void)
 {
     esplog.all("%s\n", __FUNCTION__);
+    struct date *current_time = get_current_time();
+    
     // switch off timer management (if enabled)
     if (manual_ctrl_vars.stop_after > 0)
     {
-        uint32 running_since = time->timestamp - manual_ctrl_vars.started_on;
+        uint32 running_since = current_time->timestamp - manual_ctrl_vars.started_on;
         if (running_since >= (manual_ctrl_vars.stop_after * 60))
         {
             ctrl_off();
@@ -135,32 +149,67 @@ void temp_control_manual(struct date *time)
     // heater on duty cycle
     if (is_heater_on())
     {
-        if ((time->timestamp - last_heater_on) >= (manual_ctrl_vars.heater_on_period * 60))
+        if ((current_time->timestamp - heater_vars.last_heater_on) >= (manual_ctrl_vars.heater_on_period * 60))
             switch_off_heater();
     }
     else
     {
-        if ((time->timestamp - last_heater_off) >= (manual_ctrl_vars.heater_off_period * 60))
+        if ((current_time->timestamp - heater_vars.last_heater_off) >= (manual_ctrl_vars.heater_off_period * 60))
             switch_on_heater();
     }
 }
 
-void temp_control_auto(struct date *time)
+void temp_control_auto(void)
 {
     esplog.all("%s\n", __FUNCTION__);
+    struct date *current_time = get_current_time();
     // switch off timer management (if enabled)
     if (auto_ctrl_vars.stop_after > 0)
     {
-        uint32 running_since = time->timestamp - auto_ctrl_vars.started_on;
+        uint32 running_since = current_time->timestamp - auto_ctrl_vars.started_on;
         if (running_since >= (auto_ctrl_vars.stop_after * 60))
         {
             ctrl_off();
             return;
         }
     }
+    // check if it's time to switch the heater off
+    if (is_heater_on())
+    {
+        // temperature reached the setpoint
+        if (get_temp(0) >= auto_ctrl_vars.setpoint)
+        {
+            switch_off_heater();
+            return;
+        }
+        // the heater on period has completed
+        uint32 heater_on_since = current_time->timestamp - heater_vars.last_heater_on;
+        if (heater_on_since >= (auto_ctrl_vars.heater_on_timer * 60))
+        {
+            switch_off_heater();
+            return;
+        }
+    }
+    else
+    {
+        // check if it's time to switch the heater on
+        // temperature reached the setpoint
+        if (get_temp(0) >= auto_ctrl_vars.setpoint)
+        {
+            // do nothing
+            return;
+        }
+        uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
+        if (heater_off_since >= (auto_ctrl_vars.heater_off_timer * 60))
+        {
+            recalculate_auto_ctrl_vars();
+            switch_on_heater();
+            return;
+        }
+    }
 }
 
-void temp_control_run(struct date *time)
+void temp_control_run(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esplog.debug("CTRL STATUS ------------------------------------------\n");
@@ -172,19 +221,19 @@ void temp_control_run(struct date *time)
             switch_off_heater();
         break;
     case MODE_MANUAL:
-        temp_control_manual(time);
+        temp_control_manual();
         esplog.debug("  started on -> %d %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
         break;
     case MODE_AUTO:
-        temp_control_auto(time);
+        temp_control_auto();
         esplog.debug("  started on -> %d %s\n", auto_ctrl_vars.started_on, esp_sntp.get_timestr(auto_ctrl_vars.started_on));
         break;
     default:
         break;
     }
     esplog.debug("      HEATER -> %d\n", is_heater_on());
-    esplog.debug(" switched on -> %d %s\n", last_heater_on, esp_sntp.get_timestr(last_heater_on));
-    esplog.debug("switched off -> %d %s\n", last_heater_off, esp_sntp.get_timestr(last_heater_off));
+    esplog.debug(" switched on -> %d %s\n", heater_vars.last_heater_on, esp_sntp.get_timestr(heater_vars.last_heater_on));
+    esplog.debug("switched off -> %d %s\n", heater_vars.last_heater_off, esp_sntp.get_timestr(heater_vars.last_heater_off));
 }
 
 int get_current_mode(void)

@@ -14,11 +14,12 @@
 #define DHT_HUMI_ID 51000
 #define DHT_BUFFERS 1
 
-#define TEMP_LOG_LENGTH 32
+#define TEMP_LOG_LENGTH 60
 #define INVALID_TEMP -500
 
 void temp_log_init(void);
-void temp_log_read(struct date *);
+void init_temperature_readings(void);
+void temp_log_read(void);
 int get_temp(int idx);
 
 #endif

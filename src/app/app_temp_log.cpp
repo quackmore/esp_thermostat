@@ -35,6 +35,11 @@ void temp_log_init(void)
         esplog.error("%s: not enough heap for allocating a Dht class\n", __FUNCTION__);
 }
 
+void init_temperature_readings(void)
+{
+    temp_log_read();
+}
+
 static void temp_log_read_completed(void *param)
 {
     esplog.all("%s\n", __FUNCTION__);
@@ -55,7 +60,7 @@ static void temp_log_read_completed(void *param)
         current_idx = 0;
 }
 
-void temp_log_read(struct date *time)
+void temp_log_read(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esplog.trace("... reading temperature ...\n");

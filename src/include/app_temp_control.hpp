@@ -19,7 +19,7 @@ void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after);
 void ctrl_auto(int set_point, int stop_after);
 
 
-void temp_control_run(struct date *);
+void temp_control_run(void);
 
 //
 // get control settings & vars

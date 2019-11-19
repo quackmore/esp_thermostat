@@ -47,8 +47,9 @@ void cron_sync(void);
  *         !0 -> error code
  */
 
-int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(struct date *));
+int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(void));
 
+void init_current_time(void);
 struct date *get_current_time(void);
 
 

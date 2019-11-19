@@ -36,7 +36,7 @@ struct job
     char day_of_month;
     char month;
     char day_of_week;
-    void (*command)(struct date *);
+    void (*command)(void);
 };
 
 static os_timer_t cron_timer;
@@ -162,6 +162,11 @@ struct date *get_current_time(void)
     return &current_time;
 }
 
+void init_current_time(void)
+{
+    state_current_time(&current_time);
+}
+
 static void cron_execute(void)
 {
     esplog.all("%s\n", __FUNCTION__);
@@ -203,7 +208,7 @@ static void cron_execute(void)
             continue;
         }
         if (current_job->command)
-            current_job->command(&current_time);
+            current_job->command();
         current_job = job_list->next();
     }
 }
@@ -225,14 +230,6 @@ void cron_sync(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     uint32 cron_period;
-    bool first_time = true;
-    if (first_time)
-    {
-        // don't wait a full minute before updating the current time
-        // cause a browser could require it for visualization...
-        state_current_time(&current_time);
-        first_time = false;
-    }
     uint32 timestamp = esp_sntp.get_timestamp();
     timestamp = timestamp % 60;
 
@@ -250,7 +247,7 @@ int cron_add_job(char minutes,
                  char day_of_month,
                  char month,
                  char day_of_week,
-                 void (*command)(struct date *))
+                 void (*command)(void))
 {
     esplog.all("%s\n", __FUNCTION__);
     // * # job definition:
