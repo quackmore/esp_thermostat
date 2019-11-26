@@ -17,6 +17,7 @@ extern "C"
 
 #include "espbot_global.hpp"
 #include "app.hpp"
+#include "app_activity_log.hpp"
 #include "app_cron.hpp"
 #include "app_temp_log.hpp"
 
@@ -58,6 +59,12 @@ static void temp_log_read_completed(void *param)
     current_idx++;
     if (current_idx >= TEMP_LOG_LENGTH)
         current_idx = 0;
+    // log temperature changes
+    if (get_temp(0) != get_temp(1))
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, temp_change, get_temp(0));
+    }
 }
 
 void temp_log_read(void)

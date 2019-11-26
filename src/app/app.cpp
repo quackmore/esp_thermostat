@@ -18,6 +18,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "library_dht.hpp"
 #include "app.hpp"
+#include "app_activity_log.hpp"
 #include "app_heater.hpp"
 #include "app_temp_log.hpp"
 #include "app_temp_control.hpp"
@@ -45,10 +46,11 @@ void app_init_before_wifi(void)
     init_dio_task();
     heater_init();
     temp_log_init();
-    // temp_control_init();
+    init_activity_logger();
     cron_init();
     cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read);
     cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run);
+    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, send_events_to_external_host);
     // cron_add_job(2, 0, CRON_STAR, CRON_STAR, CRON_STAR, check_ota, NULL);
 }
 

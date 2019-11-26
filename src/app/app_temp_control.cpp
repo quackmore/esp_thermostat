@@ -17,6 +17,7 @@ extern "C"
 
 #include "espbot_global.hpp"
 #include "app.hpp"
+#include "app_activity_log.hpp"
 #include "app_cron.hpp"
 #include "app_heater.hpp"
 #include "app_temp_log.hpp"
@@ -67,6 +68,12 @@ static struct _manual_ctrl_vars
 void ctrl_off(void)
 {
     esplog.all("%s\n", __FUNCTION__);
+    // log ctrl mode changes
+    if (ctrl_mode != MODE_OFF)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, mode_change, MODE_OFF);
+    }
     ctrl_mode = MODE_OFF;
     if (is_heater_on())
         switch_off_heater();
@@ -77,6 +84,11 @@ void ctrl_off(void)
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
 {
     esplog.all("%s\n", __FUNCTION__);
+    if (ctrl_mode != MODE_MANUAL)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, mode_change, MODE_MANUAL);
+    }
     ctrl_mode = MODE_MANUAL;
     manual_ctrl_vars.heater_on_period = heater_on_period;
     manual_ctrl_vars.heater_off_period = heater_off_period;
@@ -91,24 +103,56 @@ static struct _auto_ctrl_vars
     int setpoint;
     uint32 started_on; // the timestamp when auto was started
     int stop_after;    // power off timer in minutes
-    int heater_on_timer;
-    int heater_off_timer;
+    int heater_on_period;
+    int heater_off_period;
 } auto_ctrl_vars;
 
 void ctrl_auto(int set_point, int stop_after)
 {
     esplog.all("%s\n", __FUNCTION__);
+    // log ctrl mode changes
+    if (ctrl_mode != MODE_AUTO)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, mode_change, MODE_AUTO);
+    }
     ctrl_mode = MODE_AUTO;
+    // log setpoint changes
+    if (auto_ctrl_vars.setpoint != set_point)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, setpoint_change, set_point);
+    }
     auto_ctrl_vars.setpoint = set_point;
     auto_ctrl_vars.stop_after = stop_after;
     auto_ctrl_vars.started_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
     esplog.debug("TEMP CTRL -> AUTO MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
 }
 
-void recalculate_auto_ctrl_vars(void)
+bool compute_auto_ctrl_vars(void)
 {
-    auto_ctrl_vars.heater_on_timer = 2;
-    auto_ctrl_vars.heater_off_timer = 2;
+    // check if heater was off since a long time
+    // and a warm-up is required
+
+    // calculate the heater on and off periods
+    auto_ctrl_vars.heater_on_period = 2;
+    auto_ctrl_vars.heater_off_period = 2;
+
+    // state if heater has to be switched on
+    //
+    // filter measurement errors:
+    // when 5 consecutive readings are below setpoint
+    // then start the heater
+    // further ideas could be use MA instead
+    // check temperature max errors (positive and negative) over different periods
+    // to verify how effective the control is
+
+    if ((get_temp(0) < auto_ctrl_vars.setpoint) && (get_temp(1) < auto_ctrl_vars.setpoint) && (get_temp(2) < auto_ctrl_vars.setpoint))
+        return true;
+    else
+    {
+        return false;
+    }
 }
 
 void temp_control_init(void)
@@ -119,7 +163,7 @@ void temp_control_init(void)
     heater_vars.last_heater_off = 0;
 
     // CTRL
-    recalculate_auto_ctrl_vars();
+    compute_auto_ctrl_vars();
     ctrl_off();
     // COMPLETE_ME: load ctrl_mode from flash
 }
@@ -128,7 +172,7 @@ void temp_control_manual(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     struct date *current_time = get_current_time();
-    
+
     // switch off timer management (if enabled)
     if (manual_ctrl_vars.stop_after > 0)
     {
@@ -184,7 +228,7 @@ void temp_control_auto(void)
         }
         // the heater on period has completed
         uint32 heater_on_since = current_time->timestamp - heater_vars.last_heater_on;
-        if (heater_on_since >= (auto_ctrl_vars.heater_on_timer * 60))
+        if (heater_on_since >= (auto_ctrl_vars.heater_on_period * 60))
         {
             switch_off_heater();
             return;
@@ -192,18 +236,21 @@ void temp_control_auto(void)
     }
     else
     {
-        // check if it's time to switch the heater on
+        // here the heater is on
+
         // temperature reached the setpoint
         if (get_temp(0) >= auto_ctrl_vars.setpoint)
         {
             // do nothing
             return;
         }
+        // when the heater off period exhausted then
+        // start controlling
         uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
-        if (heater_off_since >= (auto_ctrl_vars.heater_off_timer * 60))
+        if (heater_off_since >= (auto_ctrl_vars.heater_off_period * 60))
         {
-            recalculate_auto_ctrl_vars();
-            switch_on_heater();
+            if (compute_auto_ctrl_vars())
+                switch_on_heater();
             return;
         }
     }

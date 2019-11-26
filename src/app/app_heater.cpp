@@ -18,6 +18,8 @@ extern "C"
 #include "app.hpp"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
+#include "app_activity_log.hpp"
+#include "app_cron.hpp"
 #include "app_heater.hpp"
 
 #define HEATER_PIN ESPBOT_D5
@@ -39,6 +41,12 @@ void heater_start(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esp_gpio.set(HEATER_PIN, ESPBOT_LOW);
+    // log heater status change
+    if (heater_on != true)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, heater_change, true);
+    }
     heater_on = true;
 }
 
@@ -54,6 +62,12 @@ void heater_stop(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esp_gpio.set(HEATER_PIN, ESPBOT_HIGH);
+    // log heater status change
+    if (heater_on != false)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, heater_change, false);
+    }
     heater_on = false;
 }
 
