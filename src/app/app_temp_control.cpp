@@ -129,29 +129,101 @@ void ctrl_auto(int set_point, int stop_after)
     esplog.debug("TEMP CTRL -> AUTO MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
 }
 
-bool compute_auto_ctrl_vars(void)
+//
+// e(t) = set-point - T(t)
+// u(t) = Kp * e(t) + Kd * (d e(t)/dt) + Ki * Integral(0,t)(e(x)dx)
+// u(t) is normalized into the range (0 - Umax)
+//
+// heater_on  [minutes] = max (heaterOnMin, u(t))
+// heater_off [minutes] = heaterOnOffPeriod - heater_on
+//
+#define CTRL_KP 1
+#define CTRL_KD -5
+#define CTRL_KI 5
+#define CTRL_UMAX 46
+#define CTRL_H_ON_MIN 2
+#define CTRL_H_ON_MAX 13
+#define CTRL_H_ON_OFF_P 15
+#define COLD_HEATER 120
+#define WARM_UP_PERIOD 12
+#define CTRL_H_ON_W_UP 3
+#define CTRL_H_OFF_W_UP 3
+
+static void compute_auto_ctrl_vars(void)
 {
-    // check if heater was off since a long time
-    // and a warm-up is required
-
-    // calculate the heater on and off periods
-    auto_ctrl_vars.heater_on_period = 2;
-    auto_ctrl_vars.heater_off_period = 2;
-
-    // state if heater has to be switched on
-    //
-    // filter measurement errors:
-    // when 5 consecutive readings are below setpoint
-    // then start the heater
-    // further ideas could be use MA instead
-    // check temperature max errors (positive and negative) over different periods
-    // to verify how effective the control is
-
-    if ((get_temp(0) < auto_ctrl_vars.setpoint) && (get_temp(1) < auto_ctrl_vars.setpoint) && (get_temp(2) < auto_ctrl_vars.setpoint))
-        return true;
+    // e(t) = set-point - T(t)
+    int e_t = auto_ctrl_vars.setpoint - get_temp(0);
+    // d e(t)/dt
+    int de_dt;
+    if (get_temp(1) == INVALID_TEMP)
+        de_dt = 0;
     else
+        de_dt = get_temp(0) - get_temp(1);
+    // Integral(t-60,t)(e(x) dx)
+    int i_e = 0;
+    int cur_val;
+    int prev_val = get_temp(1);
+    if (prev_val == INVALID_TEMP)
+        get_temp(0);
+    int idx;
+    // DEBUG
+    // os_printf(">>> PID: Integral begin\n");
+    for (idx = 0; idx < 60; idx++)
     {
-        return false;
+        cur_val = get_temp(idx);
+        if (cur_val == INVALID_TEMP)
+        {
+            i_e += (auto_ctrl_vars.setpoint - prev_val);
+            // DEBUG
+            // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - prev_val));
+        }
+        else
+        {
+            i_e += (auto_ctrl_vars.setpoint - cur_val);
+            // DEBUG
+            // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - cur_val));
+            prev_val = cur_val;
+        }
+    }
+    // DEBUG
+    // os_printf("\n>>> PID: Integral end, i_e = %d\n", i_e);
+    i_e /= 60;
+    // u(t) = Kp * e(t) + Kd * (d e(t)/dt) + Ki * Integral(0,t)(e(x)dx)
+    int u_t = CTRL_KP * e_t + CTRL_KD * de_dt + CTRL_KI * i_e;
+    // normalize u_t and clamp it to max (CTRL_H_OFF - CTRL_H_ON)
+    u_t = ((CTRL_H_ON_MAX)*u_t) / CTRL_UMAX;
+    if (u_t > CTRL_H_ON_MAX)
+        u_t = CTRL_H_ON_MAX;
+    // calculate the heater on and off periods
+    if (u_t > CTRL_H_ON_MIN)
+        auto_ctrl_vars.heater_on_period = u_t;
+    else
+        auto_ctrl_vars.heater_on_period = CTRL_H_ON_MIN;
+    auto_ctrl_vars.heater_off_period = CTRL_H_ON_OFF_P - auto_ctrl_vars.heater_on_period;
+    // DEBUG
+    // os_printf(">>> PID:              e(t): %d\n", e_t);
+    // os_printf(">>> PID:         d e(t)/dt: %d\n", de_dt);
+    // os_printf(">>> PID: I(t-60,t) e(x) dx: %d\n", i_e);
+    // os_printf(">>> PID:              u(t): %d\n", (CTRL_KP * e_t + CTRL_KD * de_dt + CTRL_KI * i_e));
+    // os_printf(">>> PID:   normalized u(t): %d\n", u_t);
+    // os_printf(">>> PID:   heater on timer: %d\n", auto_ctrl_vars.heater_on_period);
+    // os_printf(">>> PID:  heater off timer: %d\n", auto_ctrl_vars.heater_off_period);
+
+    // WARM-UP
+    // during warm-up the heater-on and heater-off timers are replaced with CTRL_H_ON_MIN
+    static uint32 warm_up_started_on = 0;
+    struct date *current_time = get_current_time();
+    uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
+    // the heater is off and was off since at least COLD_HEATER minutes
+    if (!is_heater_on() && (heater_off_since > (COLD_HEATER * 60)))
+    {
+        warm_up_started_on = current_time->timestamp;
+    }
+    if ((current_time->timestamp - warm_up_started_on) < (WARM_UP_PERIOD * 60))
+    {
+        esplog.debug("%s: warm-up phase\n", __FUNCTION__);
+        auto_ctrl_vars.heater_on_period = CTRL_H_ON_W_UP;
+        auto_ctrl_vars.heater_off_period = CTRL_H_OFF_W_UP;
     }
 }
 
@@ -163,7 +235,7 @@ void temp_control_init(void)
     heater_vars.last_heater_off = 0;
 
     // CTRL
-    compute_auto_ctrl_vars();
+    // compute_auto_ctrl_vars();
     ctrl_off();
     // COMPLETE_ME: load ctrl_mode from flash
 }
@@ -217,6 +289,8 @@ void temp_control_auto(void)
             return;
         }
     }
+    // update ctrl vars
+    compute_auto_ctrl_vars();
     // check if it's time to switch the heater off
     if (is_heater_on())
     {
@@ -236,7 +310,7 @@ void temp_control_auto(void)
     }
     else
     {
-        // here the heater is on
+        // here the heater is off
 
         // temperature reached the setpoint
         if (get_temp(0) >= auto_ctrl_vars.setpoint)
@@ -244,13 +318,11 @@ void temp_control_auto(void)
             // do nothing
             return;
         }
-        // when the heater off period exhausted then
-        // start controlling
+        // when the heater off period exhausted then turn on the heater
         uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
         if (heater_off_since >= (auto_ctrl_vars.heater_off_period * 60))
         {
-            if (compute_auto_ctrl_vars())
-                switch_on_heater();
+            switch_on_heater();
             return;
         }
     }

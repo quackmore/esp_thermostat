@@ -201,6 +201,7 @@ void post_info(void *param)
         esplog.trace("%s: POSTing str: %s\n", __FUNCTION__, msg);
         esplog.trace("%s: event %d was sent\n", __FUNCTION__, event_idx);
         espclient->send_req(msg, check_answer, (void *)event_idx);
+        delete[] msg;
     }
     break;
     default:
