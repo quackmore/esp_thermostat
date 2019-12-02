@@ -338,54 +338,6 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, "Settings saved!", false);
 }
 
-// void run_test(int);
-// 
-// static void post_test(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-// {
-//     int test_number;
-//     Json_str test_cfg(parsed_req->req_content, parsed_req->content_len);
-//     if (test_cfg.syntax_check() != JSON_SINTAX_OK)
-//     {
-//         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
-//         return;
-//     }
-//     if (test_cfg.find_pair("test_number") != JSON_NEW_PAIR_FOUND)
-//     {
-//         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'test_number'", false);
-//         return;
-//     }
-//     if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-//     {
-//         http_response(ptr_espconn, 
-//                       HTTP_BAD_REQUEST, 
-//                       HTTP_CONTENT_JSON, 
-//                       "JSON pair with string 'test_number' does not have a INTEGER value type", false);
-//         return;
-//     }
-//     Heap_chunk tmp_test_number(test_cfg.get_cur_pair_value_len());
-//     if (tmp_test_number.ref == NULL)
-//     {
-//         esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-//         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-//         return;
-//     }
-//     os_strncpy(tmp_test_number.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-//     test_number = atoi(tmp_test_number.ref);
-//     espmem.stack_mon();
-//     Heap_chunk msg(36, dont_free);
-//     if (msg.ref == NULL)
-//     {
-//         esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 36);
-//         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-//         return;
-//     }
-//     os_sprintf(msg.ref, "{\"test_number\": %d}", test_number);
-//     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
-//     // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
-//     run_test(test_number);
-//     return;
-// }
-
 bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     esplog.all("%s\n", __FUNCTION__);
