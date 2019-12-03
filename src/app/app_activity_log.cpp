@@ -16,11 +16,214 @@ extern "C"
 }
 
 #include "app.hpp"
+#include "espbot_config.hpp"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
 #include "app_activity_log.hpp"
+
+//
+// remote host configuration
+//
+
+static struct
+{
+    bool enabled;
+    char *host;
+    int port;
+    char *path;
+} remote_log_vars;
+
+static char *filename = "remote_log.cfg";
+
+bool restore_cfg(void)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    if (!espfs.is_available())
+    {
+        esplog.error("%s - file system not available\n", __FUNCTION__);
+        return false;
+    }
+    File_to_json cfgfile(filename);
+    if (cfgfile.exists())
+    {
+        // "{"enabled": ,"host": "","port": ,"path": ""}",
+        // enabled
+        if (cfgfile.find_string("enabled"))
+        {
+            esplog.error("%s - cannot find \"enabled\"\n", __FUNCTION__);
+            return false;
+        }
+        remote_log_vars.enabled = atoi(cfgfile.get_value());
+        // host
+        if (cfgfile.find_string("host"))
+        {
+            esplog.error("%s - cannot find \"host\"\n", __FUNCTION__);
+            return false;
+        }
+        if (remote_log_vars.host)
+            delete[] remote_log_vars.host;
+        remote_log_vars.host = new char[os_strlen(cfgfile.get_value()) + 1];
+        os_strcpy(remote_log_vars.host, cfgfile.get_value());
+        // port
+        if (cfgfile.find_string("port"))
+        {
+            esplog.error("%s - cannot find \"port\"\n", __FUNCTION__);
+            return false;
+        }
+        remote_log_vars.port = atoi(cfgfile.get_value());
+        // path
+        if (cfgfile.find_string("path"))
+        {
+            esplog.error("%s - cannot find \"path\"\n", __FUNCTION__);
+            return false;
+        }
+        if (remote_log_vars.path)
+            delete[] remote_log_vars.path;
+        remote_log_vars.path = new char[os_strlen(cfgfile.get_value()) + 1];
+        os_strcpy(remote_log_vars.path, cfgfile.get_value());
+        return true;
+    }
+    return false;
+}
+
+bool saved_cfg_not_updated(void)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    if (!espfs.is_available())
+    {
+        esplog.error("%s - file system not available\n", __FUNCTION__);
+        return true;
+    }
+    File_to_json cfgfile(filename);
+    if (cfgfile.exists())
+    {
+        // "{"enabled": ,"host": "","port": ,"path": ""}",
+        // enabled
+        if (cfgfile.find_string("enabled"))
+        {
+            esplog.error("%s - cannot find \"enabled\"\n", __FUNCTION__);
+            return true;
+        }
+        if (remote_log_vars.enabled != atoi(cfgfile.get_value()))
+            return true;
+        // host
+        if (cfgfile.find_string("host"))
+        {
+            esplog.error("%s - cannot find \"host\"\n", __FUNCTION__);
+            return true;
+        }
+        if (0 != os_strcmp(remote_log_vars.host, cfgfile.get_value()))
+            return true;
+        // port
+        if (cfgfile.find_string("port"))
+        {
+            esplog.error("%s - cannot find \"port\"\n", __FUNCTION__);
+            return true;
+        }
+        if (remote_log_vars.port != atoi(cfgfile.get_value()))
+            return true;
+        // path
+        if (cfgfile.find_string("path"))
+        {
+            esplog.error("%s - cannot find \"path\"\n", __FUNCTION__);
+            return true;
+        }
+        if (0 != os_strcmp(remote_log_vars.path, cfgfile.get_value()))
+            return true;
+        return false;
+    }
+    espmem.stack_mon();
+    return true;
+}
+
+void remove_cfg(void)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    if (!espfs.is_available())
+    {
+        esplog.error("%s - file system not available\n", __FUNCTION__);
+        return;
+    }
+    if (Ffile::exists(&espfs, filename))
+    {
+        Ffile cfgfile(&espfs, filename);
+        cfgfile.remove();
+    }
+}
+
+void save_cfg(void)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    if (saved_cfg_not_updated())
+        remove_cfg();
+    else
+        return;
+    if (!espfs.is_available())
+    {
+        esplog.error("%s - file system not available\n", __FUNCTION__);
+        return;
+    }
+    Ffile cfgfile(&espfs, filename);
+    if (!cfgfile.is_available())
+    {
+        esplog.error("%s - cannot open %s\n", __FUNCTION__, filename);
+        return;
+    }
+    int file_len = 44 + 1 + os_strlen(remote_log_vars.host) + 5 + os_strlen(remote_log_vars.path) + 1;
+    Heap_chunk buffer(file_len);
+    if (buffer.ref == NULL)
+    {
+        esplog.error("%s - not enough heap memory available (%d)\n", __FUNCTION__, file_len);
+        return;
+    }
+
+    // "{"enabled": ,"host": "","port": ,"path": ""}",
+    os_sprintf(buffer.ref,
+               "{\"enabled\": %d,\"host\": \"%s\",\"port\": %d,\"path\": \"%s\"}",
+               remote_log_vars.enabled,
+               remote_log_vars.host,
+               remote_log_vars.port,
+               remote_log_vars.path);
+    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
+    espmem.stack_mon();
+}
+
+void set_remote_log(bool enabled, char *host, int port, char *path)
+{
+    remote_log_vars.enabled = enabled;
+    if (remote_log_vars.host)
+        delete[] remote_log_vars.host;
+    remote_log_vars.host = new char[os_strlen(host) + 1];
+    os_strcpy(remote_log_vars.host, host);
+    remote_log_vars.port = port;
+    if (remote_log_vars.path)
+        delete[] remote_log_vars.path;
+    remote_log_vars.path = new char[os_strlen(path) + 1];
+    os_strcpy(remote_log_vars.path, path);
+    save_cfg();
+}
+
+bool get_remote_log_enabled(void)
+{
+    return remote_log_vars.enabled;
+}
+
+char *get_remote_log_host(void)
+{
+    return remote_log_vars.host;
+}
+
+int get_remote_log_port(void)
+{
+    return remote_log_vars.port;
+}
+
+char *get_remote_log_path(void)
+{
+    return remote_log_vars.path;
+}
 
 //
 // event log mngmt
@@ -47,6 +250,13 @@ void init_activity_logger(void)
         event_sent[idx] = true;
     }
     last_event_idx = 0;
+
+    remote_log_vars.enabled = false;
+    remote_log_vars.host = NULL;
+    remote_log_vars.port = 0;
+    remote_log_vars.path = NULL;
+
+    restore_cfg();
 
     espclient = new Webclnt;
 }
@@ -185,7 +395,7 @@ void post_info(void *param)
         esplog.trace("%s: event str: %s\n", __FUNCTION__, event_str);
 
         // "POST  HTTP/1.1rnHost: 111.111.111.111rnContent-Type: application/jsonrnAccept: */*rnConnection: keep-alivernContent-Length: 47rnrn{"timestamp":4294967295,"type":1,"value":1234}rn"
-        char *msg = new char[178 + os_strlen(ACTIVITY_LOG_HOST_PATH)];
+        char *msg = new char[178 + os_strlen(remote_log_vars.path)];
         os_sprintf(msg,
                    "POST %s HTTP/1.1\r\n"
                    "Host: %s\r\n"
@@ -194,8 +404,8 @@ void post_info(void *param)
                    "Connection: keep-alive\r\n"
                    "Content-Length: %d\r\n\r\n"
                    "%s\r\n",
-                   ACTIVITY_LOG_HOST_PATH,
-                   ACTIVITY_LOG_HOST_IP,
+                   remote_log_vars.path,
+                   remote_log_vars.host,
                    os_strlen(event_str),
                    event_str);
         esplog.trace("%s: POSTing str: %s\n", __FUNCTION__, msg);
@@ -217,15 +427,18 @@ void send_events_to_external_host(void)
 {
     esplog.all("%s\n", __FUNCTION__);
 
-    struct ip_addr host_ip;
-    atoipaddr(&host_ip, ACTIVITY_LOG_HOST_IP);
+    if (remote_log_vars.enabled)
+    {
+        struct ip_addr host_ip;
+        atoipaddr(&host_ip, remote_log_vars.host);
 
-    int event_idx = get_next_event_to_be_sent();
-    esplog.trace("%s: event to be sent: %d\n", __FUNCTION__, event_idx);
-    if (event_idx < 0)
-        // there are no unsent events
-        return;
-    espclient->connect(host_ip, ACTIVITY_LOG_HOST_PORT, post_info, (void *)event_idx);
+        int event_idx = get_next_event_to_be_sent();
+        esplog.trace("%s: event to be sent: %d\n", __FUNCTION__, event_idx);
+        if (event_idx < 0)
+            // there are no unsent events
+            return;
+        espclient->connect(host_ip, remote_log_vars.port, post_info, (void *)event_idx);
+    }
 }
 
 void print_last_events(void)

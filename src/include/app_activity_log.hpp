@@ -10,9 +10,9 @@
 #define __APP_ACTIVITY_LOG_HPP__
 
 #define ACTIVITY_LOG_LENGTH 60
-#define ACTIVITY_LOG_HOST_IP "192.168.1.102"
-#define ACTIVITY_LOG_HOST_PORT 1880
-#define ACTIVITY_LOG_HOST_PATH "/activity_log"
+// #define ACTIVITY_LOG_HOST_IP "192.168.1.102"
+// #define ACTIVITY_LOG_HOST_PORT 1880
+// #define ACTIVITY_LOG_HOST_PATH "/activity_log"
 
 typedef enum
 {
@@ -41,5 +41,12 @@ void log_event(uint32 timestamp, activity_event_t type, int value);
 int events_count(void);
 struct activity_event *get_event(int idx);
 void send_events_to_external_host(void);
+
+// remote host configuration
+void set_remote_log(bool enabled, char* host, int port, char* path);
+bool get_remote_log_enabled(void);
+char *get_remote_log_host(void);
+int get_remote_log_port(void);
+char *get_remote_log_path(void);
 
 #endif

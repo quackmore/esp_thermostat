@@ -1,54 +1,15 @@
 import * as esp from "./esp_queries.js";
 
+//  CURRENT VALUES
+
 setInterval(update_collapseCurrent, 15000);
 
 $(document).ready(function () {
   update_collapseCurrent();
 });
 
-$('#off_timer').change(function () {
-  $('#off_timer').val(Math.floor($('#off_timer').val()))
-});
-
-$('#cycle_on').change(function () {
-  $('#cycle_on').val(Math.floor($('#cycle_on').val()))
-});
-
-$('#cycle_off').change(function () {
-  $('#cycle_off').val(Math.floor($('#cycle_off').val()))
-});
-
-$('#ctrl_mode').change(function () {
-  refresh_settings_view();
-});
-
-$('#cont_cycle').change(function () {
-  refresh_settings_view();
-});
-
-$('#off_timer_en').change(function () {
-  refresh_settings_view();
-});
-
-$('#settings_reset').click(function () {
-  update_collapseSettings();
-});
-
-$('#settings_save').click(function () {
-  esp.save_settings(jsonify_settings,
-    function (xhr) {
-      alert("" + xhr.responseText);
-    }, function (xhr) {
-      alert("" + xhr.responseText);
-    });
-});
-
 $('#collapseCurrent').on('show.bs.collapse', function () {
   update_collapseCurrent();
-});
-
-$('#collapseSettings').on('show.bs.collapse', function () {
-  update_collapseSettings();
 });
 
 function update_collapseCurrent() {
@@ -106,6 +67,77 @@ function update_current_vars(data) {
   }
 }
 
+// CONTROL SETTINGS
+
+$('#collapseSettings').on('show.bs.collapse', function () {
+  update_collapseSettings();
+});
+
+$('#off_timer').change(function () {
+  $('#off_timer').val(Math.floor($('#off_timer').val()))
+});
+
+$('#cycle_on').change(function () {
+  $('#cycle_on').val(Math.floor($('#cycle_on').val()))
+});
+
+$('#cycle_off').change(function () {
+  $('#cycle_off').val(Math.floor($('#cycle_off').val()))
+});
+
+$('#ctrl_mode').change(function () {
+  refresh_settings_view();
+});
+
+$('#cont_cycle').change(function () {
+  refresh_settings_view();
+});
+
+$('#off_timer_en').change(function () {
+  refresh_settings_view();
+});
+
+$('#settings_reset').click(function () {
+  update_collapseSettings();
+});
+
+$('#settings_save').click(function () {
+  esp.save_settings(jsonify_settings,
+    function (xhr) {
+      alert("" + xhr.responseText);
+    }, function (xhr) {
+      alert("" + xhr.responseText);
+    });
+});
+
+function update_collapseSettings() {
+  esp.get_settings(update_settings, function (xhr) {
+    alert("" + xhr.responseText);
+  });
+}
+
+function update_settings(data) {
+  // mode: 2,
+  // manual_pulse_on: 0,
+  // manual_pulse_off: 0,
+  // auto_setpoint: 200,
+  // pwr_off: 30
+  $('#ctrl_mode').val(data.ctrl_mode);
+  if (data.manual_pulse_on == 0)
+    $('#cont_cycle').val(0);
+  else
+    $('#cont_cycle').val(1);
+  $('#cycle_on').val(data.manual_pulse_on);
+  $('#cycle_off').val(data.manual_pulse_off);
+  $('#setpoint').val((data.auto_setpoint / 10).toFixed(1));
+  if (data.pwr_off_timer == 0)
+    $('#off_timer_en').val(0);
+  else
+    $('#off_timer_en').val(1);
+  $('#off_timer').val(data.pwr_off_timer);
+  refresh_settings_view();
+}
+
 function refresh_settings_view() {
   if ($('#ctrl_mode').val() == 0) {
     $("#manual_settings").addClass('d-none');
@@ -144,28 +176,6 @@ function refresh_settings_view() {
   }
 }
 
-function update_settings(data) {
-  // mode: 2,
-  // manual_pulse_on: 0,
-  // manual_pulse_off: 0,
-  // auto_setpoint: 200,
-  // pwr_off: 30
-  $('#ctrl_mode').val(data.ctrl_mode);
-  if (data.manual_pulse_on == 0)
-    $('#cont_cycle').val(0);
-  else
-    $('#cont_cycle').val(1);
-  $('#cycle_on').val(data.manual_pulse_on);
-  $('#cycle_off').val(data.manual_pulse_off);
-  $('#setpoint').val((data.auto_setpoint / 10).toFixed(1));
-  if (data.pwr_off_timer == 0)
-    $('#off_timer_en').val(0);
-  else
-    $('#off_timer_en').val(1);
-  $('#off_timer').val(data.pwr_off_timer);
-  refresh_settings_view();
-}
-
 function jsonify_settings() {
   var to_be_saved_settings = new Object;
   to_be_saved_settings.ctrl_mode = parseInt($('#ctrl_mode').val());
@@ -182,8 +192,44 @@ function jsonify_settings() {
   return to_be_saved_settings;
 }
 
-function update_collapseSettings() {
-  esp.get_settings(update_settings, function (xhr) {
+// REMOTE LOG SETTINGS
+
+$('#collapseRemoteLogSettings').on('show.bs.collapse', function () {
+  esp.get_rl_settings(update_remoteLogSettings, function (xhr) {
     alert("" + xhr.responseText);
   });
+});
+
+$('#rl_reset').click(function () {
+  esp.get_rl_settings(update_remoteLogSettings, function (xhr) {
+    alert("" + xhr.responseText);
+  });
+});
+
+$('#rl_save').click(function () {
+  esp.save_rl_settings(jsonify_rl_settings,
+    function (xhr) {
+      alert("" + xhr.responseText);
+    }, function (xhr) {
+      alert("" + xhr.responseText);
+    });
+});
+
+function update_remoteLogSettings(data) {
+  if (data.enabled == 0)
+    $('#rl_enabled').val(0);
+  else
+    $('#rl_enabled').val(1);
+  $('#rl_host').val(data.host);
+  $('#rl_port').val(data.port);
+  $('#rl_path').val(data.path);
+}
+
+function jsonify_rl_settings() {
+  var to_be_saved_rl_settings = new Object;
+  to_be_saved_rl_settings.enabled = parseInt($('#rl_enabled').val());
+  to_be_saved_rl_settings.host = $('#rl_host').val();
+  to_be_saved_rl_settings.port = parseInt($('#rl_port').val());
+  to_be_saved_rl_settings.path = $('#rl_path').val();
+  return to_be_saved_rl_settings;
 }
