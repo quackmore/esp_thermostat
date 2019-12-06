@@ -339,6 +339,309 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, "Settings saved!", false);
 }
 
+static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    // {
+    //   kp: int,             6 digit (5 digit and sign)
+    //   kd: int,             6 digit (5 digit and sign)
+    //   ki: int,             6 digit (5 digit and sign)
+    //   u_max: int,          6 digit (5 digit and sign)
+    //   heater_on_min: int,  5 digit
+    //   heater_on_max: int,  5 digit
+    //   heater_on_off: int,  5 digit
+    //   heater_cold: int,    5 digit
+    //   warm_up_period: int, 5 digit
+    //   wup_heater_on: int,  5 digit
+    //   wup_heater_off: int  5 digit
+    // }
+    // {"kp": ,"kd": ,"ki": ,"u_max": ,"heater_on_min": ,"heater_on_max": ,"heater_on_off": ,"heater_cold": ,"warm_up_period": ,"wup_heater_on": ,"wup_heater_off": }
+    int str_len = 158 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1;
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esplog.error("%s - not enough heap memory %d\n", __FUNCTION__, str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Heap memory exhausted!", false);
+        return;
+    }
+    struct _adv_ctrl_settings *adv_settings = get_adv_ctrl_settings();
+    os_sprintf(msg.ref,
+               "{\"kp\": %d,"
+               "\"kd\": %d,"
+               "\"ki\": %d,"
+               "\"u_max\": %d,"
+               "\"heater_on_min\": %d,"
+               "\"heater_on_max\": %d,"
+               "\"heater_on_off\": %d,"
+               "\"heater_cold\": %d,"
+               "\"warm_up_period\": %d,"
+               "\"wup_heater_on\": %d,"
+               "\"wup_heater_off\": %d}",
+               adv_settings->kp,
+               adv_settings->kd,
+               adv_settings->ki,
+               adv_settings->u_max,
+               adv_settings->heater_on_min,
+               adv_settings->heater_on_max,
+               adv_settings->heater_on_off,
+               adv_settings->heater_cold,
+               adv_settings->warm_up_period,
+               adv_settings->wup_heater_on,
+               adv_settings->wup_heater_off);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void post_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    esplog.all("%s\n", __FUNCTION__);
+    // {
+    //   kp: int,             6 digit (5 digit and sign)
+    //   kd: int,             6 digit (5 digit and sign)
+    //   ki: int,             6 digit (5 digit and sign)
+    //   u_max: int,          6 digit (5 digit and sign)
+    //   heater_on_min: int,  5 digit
+    //   heater_on_max: int,  5 digit
+    //   heater_on_off: int,  5 digit
+    //   heater_cold: int,    5 digit
+    //   warm_up_period: int, 5 digit
+    //   wup_heater_on: int,  5 digit
+    //   wup_heater_off: int  5 digit
+    // }
+    //
+    Json_str settings(parsed_req->req_content, parsed_req->content_len);
+    if (settings.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        return;
+    }
+
+    struct _adv_ctrl_settings adv_ctrl_settings;
+    char tmp_str[8];
+    
+    //   kp: int,             6 digit (5 digit and sign)
+    if (settings.find_pair("kp") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'kp'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'kp' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.kp = atoi(tmp_str);
+
+    //   kd: int,             6 digit (5 digit and sign)
+    if (settings.find_pair("kd") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'kd'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'kd' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.kd = atoi(tmp_str);
+
+    //   ki: int,             6 digit (5 digit and sign)
+    if (settings.find_pair("ki") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ki'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ki' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.ki = atoi(tmp_str);
+
+    //   u_max: int,          6 digit (5 digit and sign)
+    if (settings.find_pair("u_max") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'u_max'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'u_max' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.u_max = atoi(tmp_str);
+
+    //   heater_on_min: int,  5 digit
+    if (settings.find_pair("heater_on_min") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'heater_on_min'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'heater_on_min' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.heater_on_min = atoi(tmp_str);
+
+    //   heater_on_max: int,  5 digit
+    if (settings.find_pair("heater_on_max") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'heater_on_max'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'heater_on_max' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.heater_on_max = atoi(tmp_str);
+
+    //   heater_on_off: int,  5 digit
+    if (settings.find_pair("heater_on_off") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'heater_on_off'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'heater_on_off' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.heater_on_off = atoi(tmp_str);
+
+    //   heater_cold: int,  5 digit
+    if (settings.find_pair("heater_cold") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'heater_cold'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'heater_cold' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.heater_cold = atoi(tmp_str);
+
+    //   warm_up_period: int,  5 digit
+    if (settings.find_pair("warm_up_period") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'warm_up_period'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'warm_up_period' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.warm_up_period = atoi(tmp_str);
+
+    //   wup_heater_on: int,  5 digit
+    if (settings.find_pair("wup_heater_on") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'wup_heater_on'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'wup_heater_on' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.wup_heater_on = atoi(tmp_str);
+
+    //   wup_heater_off: int,  5 digit
+    if (settings.find_pair("wup_heater_off") != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'wup_heater_off'", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'wup_heater_off' does not have an INTEGER value type", false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "number bad format", false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    adv_ctrl_settings.wup_heater_off = atoi(tmp_str);
+
+    set_adv_ctrl_settings(&adv_ctrl_settings);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, "Settings saved!", false);
+}
+
 static void get_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     esplog.all("%s\n", __FUNCTION__);
@@ -495,6 +798,74 @@ void run_test(int test_number)
         set_remote_log(true, "192.168.1.102", 1880, "/activity_log");
         break;
 
+    case 20:
+    {
+        struct _adv_ctrl_settings *adv_settings = get_adv_ctrl_settings();
+
+        os_printf("---> advanced settings cfg\n");
+        os_printf("{\"kp\": %d,"
+                  "\"kd\": %d,"
+                  "\"ki\": %d,"
+                  "\"u_max\": %d,"
+                  "\"heater_on_min\": %d,"
+                  "\"heater_on_max\": %d,"
+                  "\"heater_on_off\": %d,"
+                  "\"heater_cold\": %d,"
+                  "\"warm_up_period\": %d,"
+                  "\"wup_heater_on\": %d,"
+                  "\"wup_heater_off\": %d}",
+                  adv_settings->kp,
+                  adv_settings->kd,
+                  adv_settings->ki,
+                  adv_settings->u_max,
+                  adv_settings->heater_on_min,
+                  adv_settings->heater_on_max,
+                  adv_settings->heater_on_off,
+                  adv_settings->heater_cold,
+                  adv_settings->warm_up_period,
+                  adv_settings->wup_heater_on,
+                  adv_settings->wup_heater_off);
+    }
+    break;
+    case 21:
+    {
+        struct _adv_ctrl_settings adv_settings;
+
+        adv_settings.kp = 11;
+        adv_settings.kd = 12;
+        adv_settings.ki = 13;
+        adv_settings.u_max = 14;
+        adv_settings.heater_on_min = 15;
+        adv_settings.heater_on_max = 16;
+        adv_settings.heater_on_off = 17;
+        adv_settings.heater_cold = 18;
+        adv_settings.warm_up_period = 19;
+        adv_settings.wup_heater_on = 20;
+        adv_settings.wup_heater_off = 21;
+
+        set_adv_ctrl_settings(&adv_settings);
+    }
+    break;
+    case 22:
+    {
+        struct _adv_ctrl_settings adv_settings;
+        
+        adv_settings.kp = 31;
+        adv_settings.kd = 32;
+        adv_settings.ki = 33;
+        adv_settings.u_max = 34;
+        adv_settings.heater_on_min = 35;
+        adv_settings.heater_on_max = 36;
+        adv_settings.heater_on_off = 37;
+        adv_settings.heater_cold = 38;
+        adv_settings.warm_up_period = 39;
+        adv_settings.wup_heater_on = 40;
+        adv_settings.wup_heater_off = 41;
+
+        set_adv_ctrl_settings(&adv_settings);
+    }
+        break;
+
     default:
         break;
     }
@@ -575,6 +946,16 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     if ((0 == os_strcmp(parsed_req->url, "/api/temp_ctrl_settings")) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_temp_ctrl_settings(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, "/api/temp_ctrl_adv_settings")) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_temp_ctrl_adv_settings(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, "/api/temp_ctrl_adv_settings")) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_temp_ctrl_adv_settings(ptr_espconn, parsed_req);
         return true;
     }
     if ((0 == os_strcmp(parsed_req->url, "/api/remote_log_settings")) && (parsed_req->req_method == HTTP_GET))

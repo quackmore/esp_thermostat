@@ -37,7 +37,7 @@ static struct
 
 static char *filename = "remote_log.cfg";
 
-bool restore_cfg(void)
+static bool restore_cfg(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     if (!espfs.is_available())
@@ -88,7 +88,7 @@ bool restore_cfg(void)
     return false;
 }
 
-bool saved_cfg_not_updated(void)
+static bool saved_cfg_not_updated(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     if (!espfs.is_available())
@@ -138,7 +138,7 @@ bool saved_cfg_not_updated(void)
     return true;
 }
 
-void remove_cfg(void)
+static void remove_cfg(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     if (!espfs.is_available())
@@ -153,7 +153,7 @@ void remove_cfg(void)
     }
 }
 
-void save_cfg(void)
+static void save_cfg(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     if (saved_cfg_not_updated())
@@ -251,12 +251,13 @@ void init_activity_logger(void)
     }
     last_event_idx = 0;
 
-    remote_log_vars.enabled = false;
-    remote_log_vars.host = NULL;
-    remote_log_vars.port = 0;
-    remote_log_vars.path = NULL;
-
-    restore_cfg();
+    if (!restore_cfg())
+    {
+        remote_log_vars.enabled = false;
+        remote_log_vars.host = NULL;
+        remote_log_vars.port = 0;
+        remote_log_vars.path = NULL;
+    }
 
     espclient = new Webclnt;
 }

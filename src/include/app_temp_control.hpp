@@ -13,6 +13,34 @@
 #define MODE_MANUAL 1
 #define MODE_AUTO 2
 
+// control advanced setting
+#define CTRL_KP 1
+#define CTRL_KD -5
+#define CTRL_KI 5
+#define CTRL_U_MAX 46
+#define CTRL_HEATER_ON_MIN 2
+#define CTRL_HEATER_ON_MAX 13
+#define CTRL_HEATER_ON_OFF_P 15
+#define COLD_HEATER 120
+#define WARM_UP_PERIOD 12
+#define CTRL_HEATER_ON_WUP 3
+#define CTRL_HEATER_OFF_WUP 3
+
+struct _adv_ctrl_settings
+{
+    int kp;
+    int kd;
+    int ki;
+    int u_max;
+    int heater_on_min;
+    int heater_on_max;
+    int heater_on_off;
+    int heater_cold;
+    int warm_up_period;
+    int wup_heater_on;
+    int wup_heater_off;
+};
+
 void temp_control_init(void);
 void ctrl_off(void);
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after);
@@ -30,5 +58,7 @@ uint32 get_pwr_off_timer_started_on(void);
 int get_auto_setpoint(void);
 int get_manual_pulse_on(void);
 int get_manual_pulse_off(void);
+void set_adv_ctrl_settings(struct _adv_ctrl_settings *);
+struct _adv_ctrl_settings *get_adv_ctrl_settings(void);
 
 #endif
