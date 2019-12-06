@@ -117,11 +117,6 @@ function update_collapseSettings() {
 }
 
 function update_settings(data) {
-  // mode: 2,
-  // manual_pulse_on: 0,
-  // manual_pulse_off: 0,
-  // auto_setpoint: 200,
-  // pwr_off: 30
   $('#ctrl_mode').val(data.ctrl_mode);
   if (data.manual_pulse_on == 0)
     $('#cont_cycle').val(0);
@@ -190,6 +185,59 @@ function jsonify_settings() {
   else
     to_be_saved_settings.power_off_timer = parseInt($('#off_timer').val());
   return to_be_saved_settings;
+}
+
+// ADVANCED CONTROL SETTINGS
+
+$('#collapseAdvSettings').on('show.bs.collapse', function () {
+  esp.get_adv_ctrl_settings(update_advCtrlSettings, function (xhr) {
+    alert("" + xhr.responseText);
+  });
+});
+
+$('#adv_settings_reset').click(function () {
+  esp.get_adv_ctrl_settings(update_advCtrlSettings, function (xhr) {
+    alert("" + xhr.responseText);
+  });
+});
+
+$('#adv_settings_save').click(function () {
+  esp.save_adv_ctrl_settings(jsonify_advCtrlSettings,
+    function (xhr) {
+      alert("" + xhr.responseText);
+    }, function (xhr) {
+      alert("" + xhr.responseText);
+    });
+});
+
+function update_advCtrlSettings(data) {
+  $('#adv_sett_kp').val(data.kp);
+  $('#adv_sett_kd').val(data.kd);
+  $('#adv_sett_ki').val(data.ki);
+  $('#adv_sett_u_max').val(data.u_max);
+  $('#adv_sett_heater_on_min').val(data.heater_on_min);
+  $('#adv_sett_heater_on_max').val(data.heater_on_max);
+  $('#adv_sett_heater_on_off').val(data.heater_on_off);
+  $('#adv_sett_heater_cold').val(data.heater_cold);
+  $('#adv_sett_warm_up_period').val(data.warm_up_period);
+  $('#adv_sett_wup_heater_on').val(data.wup_heater_on);
+  $('#adv_sett_wup_heater_off').val(data.wup_heater_off);
+}
+
+function jsonify_advCtrlSettings() {
+  var to_be_saved_adv_settings = new Object;
+  to_be_saved_adv_settings.kp = parseInt($('#adv_sett_kp').val());
+  to_be_saved_adv_settings.kd = parseInt($('#adv_sett_kd').val());
+  to_be_saved_adv_settings.ki = parseInt($('#adv_sett_ki').val());
+  to_be_saved_adv_settings.u_max = parseInt($('#adv_sett_u_max').val());
+  to_be_saved_adv_settings.heater_on_min = parseInt($('#adv_sett_heater_on_min').val());
+  to_be_saved_adv_settings.heater_on_max = parseInt($('#adv_sett_heater_on_max').val());
+  to_be_saved_adv_settings.heater_on_off = parseInt($('#adv_sett_heater_on_off').val());
+  to_be_saved_adv_settings.heater_cold = parseInt($('#adv_sett_heater_cold').val());
+  to_be_saved_adv_settings.warm_up_period = parseInt($('#adv_sett_warm_up_period').val());
+  to_be_saved_adv_settings.wup_heater_on = parseInt($('#adv_sett_wup_heater_on').val());
+  to_be_saved_adv_settings.wup_heater_off = parseInt($('#adv_sett_wup_heater_off').val());
+  return to_be_saved_adv_settings;
 }
 
 // REMOTE LOG SETTINGS

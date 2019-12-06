@@ -1,8 +1,8 @@
 const esp8266 = {
-  "url": "http://192.168.1.185",
-  "cors": true
-  // "url": "",
-  // "cors": false
+  // "url": "http://192.168.1.185",
+  // "cors": true
+  "url": "",
+  "cors": false
 };
 
 function get_current_vars(success_cb, error_cb) {
@@ -103,4 +103,36 @@ function save_rl_settings(get_data, success_cb, error_cb) {
   })
 }
 
-export { get_current_vars, get_settings, save_settings, get_rl_settings, save_rl_settings };
+function get_adv_ctrl_settings(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/temp_ctrl_adv_settings',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+}
+
+function save_adv_ctrl_settings(get_data, success_cb, error_cb) {
+  $.ajax({
+    type: 'POST',
+    url: esp8266.url + '/api/temp_ctrl_adv_settings',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(get_data()),
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  })
+}
+
+export { get_current_vars, get_settings, save_settings, get_rl_settings, save_rl_settings, get_adv_ctrl_settings, save_adv_ctrl_settings };
