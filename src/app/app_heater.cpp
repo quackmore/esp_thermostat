@@ -22,7 +22,9 @@ extern "C"
 #include "app_cron.hpp"
 #include "app_heater.hpp"
 
-#define HEATER_PIN ESPBOT_D5
+#define HEATER_PIN ESPBOT_D2
+#define HEATER_ON ESPBOT_HIGH
+#define HEATER_OFF ESPBOT_LOW
 
 static os_timer_t heater_period_timer;
 static bool heater_on;
@@ -31,7 +33,7 @@ void heater_init(void)
 {
     esplog.all("%s\n", __FUNCTION__);
     esp_gpio.config(HEATER_PIN, ESPBOT_GPIO_OUTPUT);
-    esp_gpio.set(HEATER_PIN, ESPBOT_HIGH);
+    esp_gpio.set(HEATER_PIN, HEATER_OFF);
     os_timer_disarm(&heater_period_timer);
     os_timer_setfn(&heater_period_timer, (os_timer_func_t *)heater_stop, NULL);
     heater_on = false;
@@ -40,7 +42,7 @@ void heater_init(void)
 void heater_start(void)
 {
     esplog.all("%s\n", __FUNCTION__);
-    esp_gpio.set(HEATER_PIN, ESPBOT_LOW);
+    esp_gpio.set(HEATER_PIN, HEATER_ON);
     // log heater status change
     if (heater_on != true)
     {
@@ -54,14 +56,14 @@ void heater_start(void)
 // {
 //     esplog.all("%s\n", __FUNCTION__);
 //     os_timer_arm(&heater_period_timer, period, 0);
-//     esp_gpio.set(HEATER_PIN, ESPBOT_LOW);
+//     esp_gpio.set(HEATER_PIN, HEATER_ON);
 //     heater_on = true;
 // }
 
 void heater_stop(void)
 {
     esplog.all("%s\n", __FUNCTION__);
-    esp_gpio.set(HEATER_PIN, ESPBOT_HIGH);
+    esp_gpio.set(HEATER_PIN, HEATER_OFF);
     // log heater status change
     if (heater_on != false)
     {

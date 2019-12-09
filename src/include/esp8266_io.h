@@ -90,4 +90,17 @@ int gpio_FUNC(int);
 //                                       -> level = GPIO_INPUT_GET(ESPBOT_D1_NUM)
 // 
 
+// 
+// behaviour at boot for digital outputs
+//
+// D1 -> LOW                    -> espbot will set LOW when configured as output
+// D2 -> LOW                    -> espbot will set LOW when configured as output
+// D3 -> LOW  ?? to be verified -> espbot will set LOW when configured as output
+// D4 -> HIGH ?? to be verified -> espbot will set HIGH when configured as output (connected to led on board)
+// D5 -> HIGH                   -> espbot will set HIGH when configured as output
+// D6 -> HIGH                   -> espbot will set HIGH when configured as output
+// D7 -> HIGH                   -> espbot will set HIGH when configured as output
+// D8 -> LOW                    -> espbot will set LOW when configured as output
+//
+
 #endif
