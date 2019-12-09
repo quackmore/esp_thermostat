@@ -149,43 +149,52 @@ static struct _adv_ctrl_settings adv_settings;
 
 static void compute_auto_ctrl_vars(void)
 {
-    // e(t) = set-point - T(t)
-    int e_t = auto_ctrl_vars.setpoint - get_temp(0);
-    // d e(t)/dt
-    int de_dt;
-    if (get_temp(1) == INVALID_TEMP)
-        de_dt = 0;
-    else
-        de_dt = get_temp(0) - get_temp(1);
-    // Integral(t-60,t)(e(x) dx)
-    int i_e = 0;
-    int cur_val;
-    int prev_val = get_temp(1);
-    if (prev_val == INVALID_TEMP)
-        get_temp(0);
-    int idx;
-    // DEBUG
-    // os_printf(">>> PID: Integral begin\n");
-    for (idx = 0; idx < 60; idx++)
+    // defined as static so that previous value is preserved
+    static int e_t = 0;
+    static int de_dt = 0;
+    static int i_e = 0;
+    int current_temp = get_temp(0);
+    // on valid temperature reading calculate error
+    // otherwise go on with previous values
+    if (current_temp != INVALID_TEMP)
     {
-        cur_val = get_temp(idx);
-        if (cur_val == INVALID_TEMP)
+        // e(t) = set-point - T(t)
+        e_t = auto_ctrl_vars.setpoint - current_temp;
+        // d e(t)/dt
+        // on valid temperature reading calculate error derivative
+        // otherwise go on with previous values
+        if (get_temp(1) != INVALID_TEMP)
+            de_dt = current_temp - get_temp(1);
+        // Integral(t-60,t)(e(x) dx)
+        i_e = 0;
+        int cur_val;
+        int prev_val = get_temp(1);
+        if (prev_val == INVALID_TEMP)
+            prev_val = current_temp;
+        int idx;
+        // DEBUG
+        // os_printf(">>> PID: Integral begin\n");
+        for (idx = 0; idx < 60; idx++)
         {
-            i_e += (auto_ctrl_vars.setpoint - prev_val);
-            // DEBUG
-            // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - prev_val));
+            cur_val = get_temp(idx);
+            if (cur_val == INVALID_TEMP)
+            {
+                i_e += (auto_ctrl_vars.setpoint - prev_val);
+                // DEBUG
+                // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - prev_val));
+            }
+            else
+            {
+                i_e += (auto_ctrl_vars.setpoint - cur_val);
+                // DEBUG
+                // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - cur_val));
+                prev_val = cur_val;
+            }
         }
-        else
-        {
-            i_e += (auto_ctrl_vars.setpoint - cur_val);
-            // DEBUG
-            // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - cur_val));
-            prev_val = cur_val;
-        }
+        // DEBUG
+        // os_printf("\n>>> PID: Integral end, i_e = %d\n", i_e);
+        i_e /= 60;
     }
-    // DEBUG
-    // os_printf("\n>>> PID: Integral end, i_e = %d\n", i_e);
-    i_e /= 60;
     // u(t) = Kp * e(t) + Kd * (d e(t)/dt) + Ki * Integral(0,t)(e(x)dx)
     int u_t = adv_settings.kp * e_t + adv_settings.kd * de_dt + adv_settings.ki * i_e;
     // normalize u_t and clamp it to max (CTRL_H_OFF - CTRL_H_ON)
@@ -721,7 +730,7 @@ static void save_adv_cfg(void)
     //   wup_heater_off: int  5 digit
     // }
 
-// {"kp": ,"kd": ,"ki": ,"u_max": ,"heater_on_min": ,"heater_on_max": ,"heater_on_off": ,"heater_cold": ,"warm_up_period": ,"wup_heater_on": ,"wup_heater_off": }
+    // {"kp": ,"kd": ,"ki": ,"u_max": ,"heater_on_min": ,"heater_on_max": ,"heater_on_off": ,"heater_cold": ,"warm_up_period": ,"wup_heater_on": ,"wup_heater_off": }
     char buffer[(158 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1)];
     os_sprintf(buffer,
                "{\"kp\": %d,"
@@ -769,7 +778,6 @@ struct _adv_ctrl_settings *get_adv_ctrl_settings(void)
 {
     return &adv_settings;
 }
-
 
 // end CFG management
 
