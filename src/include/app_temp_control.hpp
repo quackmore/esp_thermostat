@@ -22,9 +22,9 @@
 #define CTRL_HEATER_ON_MAX 13
 #define CTRL_HEATER_ON_OFF_P 15
 #define COLD_HEATER 120
-#define WARM_UP_PERIOD 12
+#define WARM_UP_PERIOD 21
 #define CTRL_HEATER_ON_WUP 3
-#define CTRL_HEATER_OFF_WUP 3
+#define CTRL_HEATER_OFF_WUP 4
 
 struct _adv_ctrl_settings
 {
