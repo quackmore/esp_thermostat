@@ -26,7 +26,7 @@ extern "C"
 #define HEATER_ON ESPBOT_HIGH
 #define HEATER_OFF ESPBOT_LOW
 
-static os_timer_t heater_period_timer;
+static os_timer_t heater_delay_timer;
 static bool heater_on;
 
 void heater_init(void)
@@ -34,15 +34,20 @@ void heater_init(void)
     esplog.all("%s\n", __FUNCTION__);
     esp_gpio.config(HEATER_PIN, ESPBOT_GPIO_OUTPUT);
     esp_gpio.set(HEATER_PIN, HEATER_OFF);
-    os_timer_disarm(&heater_period_timer);
-    os_timer_setfn(&heater_period_timer, (os_timer_func_t *)heater_stop, NULL);
+    os_timer_disarm(&heater_delay_timer);
     heater_on = false;
+}
+
+void heater_switch_on(void)
+{
+    esp_gpio.set(HEATER_PIN, HEATER_ON);
 }
 
 void heater_start(void)
 {
     esplog.all("%s\n", __FUNCTION__);
-    esp_gpio.set(HEATER_PIN, HEATER_ON);
+    os_timer_setfn(&heater_delay_timer, (os_timer_func_t *)heater_switch_on, NULL);
+    os_timer_arm(&heater_delay_timer, 1000, 0);
     // log heater status change
     if (heater_on != true)
     {
@@ -52,18 +57,16 @@ void heater_start(void)
     heater_on = true;
 }
 
-// void heater_start(int period)
-// {
-//     esplog.all("%s\n", __FUNCTION__);
-//     os_timer_arm(&heater_period_timer, period, 0);
-//     esp_gpio.set(HEATER_PIN, HEATER_ON);
-//     heater_on = true;
-// }
+void heater_switch_off(void)
+{
+    esp_gpio.set(HEATER_PIN, HEATER_OFF);
+}
 
 void heater_stop(void)
 {
     esplog.all("%s\n", __FUNCTION__);
-    esp_gpio.set(HEATER_PIN, HEATER_OFF);
+    os_timer_setfn(&heater_delay_timer, (os_timer_func_t *)heater_switch_off, NULL);
+    os_timer_arm(&heater_delay_timer, 1000, 0);
     // log heater status change
     if (heater_on != false)
     {
