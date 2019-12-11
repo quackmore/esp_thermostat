@@ -226,7 +226,7 @@ static void compute_auto_ctrl_vars(void)
     {
         warm_up_started_on = current_time->timestamp;
     }
-    if ((current_time->timestamp - warm_up_started_on) < (adv_settings.heater_cold * 60))
+    if ((current_time->timestamp - warm_up_started_on) < (adv_settings.warm_up_period * 60))
     {
         esplog.debug("%s: warm-up phase\n", __FUNCTION__);
         auto_ctrl_vars.heater_on_period = adv_settings.wup_heater_on;
