@@ -12,6 +12,24 @@
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
     integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <style>
+    .table-responsive {
+      height: 350px;
+      overflow: scroll-y;
+    }
+
+    .bd-example-modal-lg .modal-dialog {
+      display: table;
+      position: relative;
+      margin: 0 auto;
+      top: calc(50% - 24px);
+    }
+
+    .bd-example-modal-lg .modal-dialog .modal-content {
+      background-color: transparent;
+      border: none;
+    }
+  </style>
 </head>
 
 <body class="bg-secondary  col-sm-6 mx-auto">
@@ -132,19 +150,22 @@
               <div class="form-group row">
                 <label for="adv_sett_kp" class="col-sm-6 col-form-label text-left">Kp</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="1" min="-32768" max="32767" step="1" class="form-control" id="adv_sett_kp">
+                  <input type="number" value="1" min="-32768" max="32767" step="1" class="form-control"
+                    id="adv_sett_kp">
                 </div>
               </div>
               <div class="form-group row">
                 <label for="adv_sett_kd" class="col-sm-6 col-form-label text-left">Kd</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="5" min="-32768" max="32767" step="1" class="form-control" id="adv_sett_kd">
+                  <input type="number" value="5" min="-32768" max="32767" step="1" class="form-control"
+                    id="adv_sett_kd">
                 </div>
               </div>
               <div class="form-group row">
                 <label for="adv_sett_ki" class="col-sm-6 col-form-label text-left">Ki</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="5" min="-32768" max="32767" step="1" class="form-control" id="adv_sett_ki">
+                  <input type="number" value="5" min="-32768" max="32767" step="1" class="form-control"
+                    id="adv_sett_ki">
                 </div>
               </div>
               <div class="form-group row">
@@ -154,45 +175,58 @@
                 </div>
               </div>
               <div class="form-group row">
-                <label for="adv_sett_heater_on_min" class="col-sm-6 col-form-label text-left">Heater ON min [min]</label>
+                <label for="adv_sett_heater_on_min" class="col-sm-6 col-form-label text-left">Heater ON min
+                  [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="2" min="0" max="32767" step="1" class="form-control" id="adv_sett_heater_on_min">
+                  <input type="number" value="2" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_heater_on_min">
                 </div>
               </div>
               <div class="form-group row">
-                <label for="adv_sett_heater_on_max" class="col-sm-6 col-form-label text-left">Heater ON max [min]</label>
+                <label for="adv_sett_heater_on_max" class="col-sm-6 col-form-label text-left">Heater ON max
+                  [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="13" min="0" max="32767" step="1" class="form-control" id="adv_sett_heater_on_max">
+                  <input type="number" value="13" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_heater_on_max">
                 </div>
               </div>
               <div class="form-group row">
-                <label for="adv_sett_heater_on_off" class="col-sm-6 col-form-label text-left">Heater ON/OFF period [min]</label>
+                <label for="adv_sett_heater_on_off" class="col-sm-6 col-form-label text-left">Heater ON/OFF period
+                  [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="15" min="0" max="32767" step="1" class="form-control" id="adv_sett_heater_on_off">
+                  <input type="number" value="15" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_heater_on_off">
                 </div>
               </div>
               <div class="form-group row">
                 <label for="adv_sett_heater_cold" class="col-sm-6 col-form-label text-left">Heater cold [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="120" min="0" max="32767" step="1" class="form-control" id="adv_sett_heater_cold">
+                  <input type="number" value="120" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_heater_cold">
                 </div>
               </div>
               <div class="form-group row">
-                <label for="adv_sett_warm_up_period" class="col-sm-6 col-form-label text-left">Warm up period [min]</label>
+                <label for="adv_sett_warm_up_period" class="col-sm-6 col-form-label text-left">Warm up period
+                  [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="12" min="0" max="32767" step="1" class="form-control" id="adv_sett_warm_up_period">
+                  <input type="number" value="12" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_warm_up_period">
                 </div>
               </div>
               <div class="form-group row">
-                <label for="adv_sett_wup_heater_on" class="col-sm-6 col-form-label text-left">Heater ON (warm up) [min]</label>
+                <label for="adv_sett_wup_heater_on" class="col-sm-6 col-form-label text-left">Heater ON (warm up)
+                  [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="3" min="0" max="32767" step="1" class="form-control" id="adv_sett_wup_heater_on">
+                  <input type="number" value="3" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_wup_heater_on">
                 </div>
               </div>
               <div class="form-group row">
-                <label for="adv_sett_wup_heater_off" class="col-sm-6 col-form-label text-left">Heater OFF (warm up) [min]</label>
+                <label for="adv_sett_wup_heater_off" class="col-sm-6 col-form-label text-left">Heater OFF (warm up)
+                  [min]</label>
                 <div class="input-group col-sm-6">
-                  <input type="number" value="3" min="0" max="32767" step="1" class="form-control" id="adv_sett_wup_heater_off">
+                  <input type="number" value="3" min="0" max="32767" step="1" class="form-control"
+                    id="adv_sett_wup_heater_off">
                 </div>
               </div>
               <div class="row">
@@ -263,6 +297,61 @@
             </div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-header" id="headingFive">
+            <h5 class="mb-0">
+              <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseDiagnosticEvents"
+                aria-expanded="false" aria-controls="collapseDiagnosticEvents">
+                DIAGNOSTIC EVENTS
+              </button>
+            </h5>
+          </div>
+          <div id="collapseDiagnosticEvents" class="collapse" aria-labelledby="headingFive" data-parent="#accordion">
+            <div class="card-body">
+              <div class="table-responsive text-nowrap table-sm small">
+                <table class="table table-striped" id="diag_event_table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Timestamp</th>
+                      <th scope="col">Type</th>
+                      <th scope="col">Code</th>
+                      <th scope="col">Desc</th>
+                      <th scope="col">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="text-success">
+                      <th scope="row">Wed Feb 05 09:41:09 2020</th>
+                      <td>ERROR</td>
+                      <td>0054</td>
+                      <td>Example (Acknowledged)</td>
+                      <td>00000000</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Wed Feb 05 09:41:09 2020</th>
+                      <td>ERROR</td>
+                      <td>0054</td>
+                      <td>Example</td>
+                      <td>00000000</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="row">
+                <div class="mx-auto">
+                  <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
+                    <div class="btn-group mr-2" role="group" aria-label="First group">
+                      <button type="button" class="btn btn-primary" id="diag_e_refresh">Refresh</button>
+                    </div>
+                    <div class="btn-group mr-2" role="group" aria-label="Second group">
+                      <button type="button" class="btn btn-primary" id="diag_e_ack">Acknowledge</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card-footer text-muted ">
@@ -281,8 +370,8 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
     integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
     crossorigin="anonymous"></script>
-  <script type="module" src="esp_queries.js"></script>
-  <script type="module" src="html_dyn.js"></script>
+  <script src="html_dyn.js"></script>
+  <script src="event_codes.js"></script>
 </body>
 
 </html>

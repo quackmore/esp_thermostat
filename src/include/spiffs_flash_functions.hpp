@@ -38,55 +38,14 @@
 #define SPIFFS_FLASH_RESULT_TIMEOUT -10201
 #define SPIFFS_FLASH_BOUNDARY_ERROR -10202
 
-// debug macros
-#include "espbot_global.hpp"
-#include "espbot_logger.hpp"
-#define P_FATAL(...) esplog.fatal(__VA_ARGS__)
-#define P_ERROR(...) esplog.error(__VA_ARGS__)
-#define P_WARN(...) esplog.warn(__VA_ARGS__)
-#define P_INFO(...) esplog.info(__VA_ARGS__)
-#define P_DEBUG(...) esplog.debug(__VA_ARGS__)
-#define P_TRACE(...) esplog.trace(__VA_ARGS__)
-#define P_ALL(...) esplog.all(__VA_ARGS__)
-/*
-#define SPIFFS_DEBUG (1)
-#if SPIFFS_DEBUG
-#define P_FATAL(...) os_printf(__VA_ARGS__)
-#define P_ERROR(...) os_printf(__VA_ARGS__)
-#define P_WARN(...) os_printf(__VA_ARGS__)
-#define P_INFO(...) os_printf(__VA_ARGS__)
-#define P_DEBUG(...) os_printf(__VA_ARGS__)
-#define P_TRACE(...) os_printf(__VA_ARGS__)
-#define P_ALL(...) os_printf(__VA_ARGS__)
-#else
-#define P_FATAL(...) \
-  {                  \
-  }
-#define P_ERROR(...) \
-  {                  \
-  }
-#define P_WARN(...) \
-  {                 \
-  }
-#define P_INFO(...) \
-  {                 \
-  }
-#define P_DEBUG(...) \
-  {                  \
-  }
-#define P_TRACE(...) \
-  {                  \
-  }
-#define P_ALL(...) \
-  {                \
-  }
-#endif
-*/
+extern "C"
+{
 #include "spiffs.h" // for spiffs types
 
 // flash memory functions (checkout SPIFFS doumentation)
 s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst);
 s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src);
 s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size);
+}
 
 #endif

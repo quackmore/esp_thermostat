@@ -9,6 +9,8 @@
 #ifndef __APP_HEATER_HPP__
 #define __APP_HEATER_HPP__
 
+#define HEATER_RELAY_DELAY 2000
+
 void heater_init(void);
 void heater_start(void);
 // void heater_start(int period); // will stop after period (milliseconds)

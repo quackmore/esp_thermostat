@@ -6,13 +6,13 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __APP_ACTIVITY_LOG_HPP__
-#define __APP_ACTIVITY_LOG_HPP__
+#ifndef __APP_REMOTE_LOG_HPP__
+#define __APP_REMOTE_LOG_HPP__
 
-#define ACTIVITY_LOG_LENGTH 60
-// #define ACTIVITY_LOG_HOST_IP "192.168.1.102"
-// #define ACTIVITY_LOG_HOST_PORT 1880
-// #define ACTIVITY_LOG_HOST_PATH "/activity_log"
+#define REMOTE_LOG_LENGTH 60
+// #define REMOTE_LOG_HOST_IP "192.168.1.102"
+// #define REMOTE_LOG_HOST_PORT 1880
+// #define REMOTE_LOG_HOST_PATH "/remote_log"
 
 typedef enum
 {
@@ -36,7 +36,7 @@ struct activity_event
     // };
 };
 
-void init_activity_logger(void);
+void init_remote_logger(void);
 void log_event(uint32 timestamp, activity_event_t type, int value);
 int events_count(void);
 struct activity_event *get_event(int idx);

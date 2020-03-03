@@ -53,7 +53,7 @@ public:
   char *get_cur_pair_value(void);                // return current pair value as string (NULL if none)
   int get_cur_pair_value_len(void);              // return current pair value length (0 if none)
   // char *get_cursor(void);                        // for debug purposes
-  Json_pair_type find_pair(char *t_string);      // find json pair with string == t_string
+  Json_pair_type find_pair(const char *t_string);      // find json pair with string == t_string
 };
 
 #endif

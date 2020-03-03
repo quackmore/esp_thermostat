@@ -7,19 +7,19 @@
  * ----------------------------------------------------------------------------
  */
 
-#ifndef __MDNS_HPP__
-#define __MDNS_HPP__
+#ifndef __TIMEDATE_HPP__
+#define __TIMEDATE_HPP__
 
 extern "C"
 {
-#include "espconn.h"
+#include "c_types.h"
 }
 
-class Mdns
+class TimeDate
 {
 private:
-  bool _enabled;
-  struct mdns_info _info;
+  bool _sntp_enabled;
+  signed char _timezone;
 
   int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR
   int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
@@ -27,18 +27,26 @@ private:
                                    // return CFG_ERROR otherwise
 
 public:
-  Mdns(){};
-  ~Mdns(){};
+  TimeDate(){};
+  ~TimeDate(){};
 
   void init(void);
   int save_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
 
-  void enable(void);
-  void disable(void);
-  bool is_enabled(void);
+  void enable_sntp(void);
+  void disable_sntp(void);
+  bool sntp_enabled(void);
 
-  void start(char *app_alias);
-  void stop(void);
+  void start_sntp(void);
+  void stop_sntp(void);
+
+  void set_timezone(signed char);
+  signed char get_timezone(void);
+
+  void set_time_manually(uint32); // takes UTC time
+
+  uint32 get_timestamp();
+  char *get_timestr(uint32);
 };
 
 #endif

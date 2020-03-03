@@ -6,21 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __APP_TEMP_LOG_HPP__
-#define __APP_TEMP_LOG_HPP__
+#ifndef __LIBRARY_EVENT_CODES_H__
+#define __LIBRARY_EVENT_CODES_H__
 
-//#define DHT_DATA ESPBOT_D5
-#define DHT_DATA ESPBOT_D2
-#define DHT_TEMP_ID 50000
-#define DHT_HUMI_ID 51000
-#define DHT_BUFFERS 1
+#define DHT_HEAP_EXHAUSTED 0x0100
+#define DHT_READING_TIMEOUT 0x0101
+#define DHT_READING_CHECKSUM_ERR 0x0102
+#define DHT_READ_HEAP_EXHAUSTED 0x0103
 
-#define TEMP_LOG_LENGTH 60
-#define INVALID_TEMP -500
-
-void temp_log_init(void);
-void init_temperature_readings(void);
-void temp_log_read(void);
-int get_temp(int idx);
+#define MAX6675_THERMOCOUPLE_DISCONNECTED 0x0104
+#define MAX6675_HEAP_EXHAUSTED 0x0105
 
 #endif

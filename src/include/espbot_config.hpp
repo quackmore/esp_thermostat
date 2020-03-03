@@ -9,6 +9,10 @@
 #ifndef __CONFIG_HPP__
 #define __CONFIG_HPP__
 
+#define CFG_OK 0
+#define CFG_REQUIRES_UPDATE 1
+#define CFG_ERROR 2
+
 class File_to_json
 {
 private:
@@ -19,10 +23,10 @@ private:
   int get_value_len(void);
 
 public:
-  File_to_json(char *); // require filename
+  File_to_json(const char *); // require filename
   ~File_to_json();
   bool exists(void);
-  int find_string(char *); // require string name of a json pair
+  int find_string(const char *); // require string name of a json pair
                            // return 0 on success !=0 on fail
   char *get_value(void);
 };

@@ -84,7 +84,7 @@ public:
 };
 
 // parse_request takes the incoming string req and fill in parsed_req
-void http_parse_request(char *req, Http_parsed_req *parsed_req);
+void http_parse_request(char *req, unsigned short length, Http_parsed_req *parsed_req);
 
 // espconn_send custom callback
 void http_sentcb(void *arg);
@@ -125,6 +125,7 @@ struct http_send
 {
   struct espconn *p_espconn;
   char *msg;
+  int msg_len;
 };
 
 struct http_split_send
@@ -144,7 +145,7 @@ void http_check_pending_send(void);
 // quick format an http response and send it
 //    free_msg must be false when passing a "string" allocated into text or data segment
 //    free_msg must be true when passing an heap allocated string
-void http_response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg);
+void http_response(struct espconn *p_espconn, int code, char *content_type, const char *msg, bool free_msg);
 
 // format header string
 char *http_format_header(class Http_header *);
@@ -154,10 +155,10 @@ char *http_format_header(class Http_header *);
 // http_send will take care of splitting the message according to the buffer size
 // and will repeadetely call http_send_buffer
 // will free the msg buffer after it has been sent (msg must be allocated on heap)
-void http_send(struct espconn *p_espconn, char *msg);
+void http_send(struct espconn *p_espconn, char *msg, int msg_len);
 
 // http_send_buffer will manage calling espconn_send avoiding new calls before completion
-void http_send_buffer(struct espconn *p_espconn, char *msg);
+void http_send_buffer(struct espconn *p_espconn, char *msg, int msg_len);
 
 //
 // incoming response for a client

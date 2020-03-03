@@ -56,8 +56,8 @@ public:
     void getSensor(sensor_t *);
 
   private:
-    Dht *m_parent;
-    int m_id;
+    Dht *_parent;
+    int _id;
   };
 
   Temperature temperature;
@@ -74,31 +74,31 @@ public:
     void getSensor(sensor_t *);
 
   private:
-    Dht *m_parent;
-    int m_id;
+    Dht *_parent;
+    int _id;
   };
 
   Humidity humidity;
 
   // this is private but into public section
   // for making variables accessible to timer callback functions
-  uint8_t m_data[5];
-  int m_pin;
-  Dht_type m_type;
-  int m_poll_interval;
-  os_timer_t m_poll_timer;
-  struct do_seq *m_dht_out_sequence;
-  struct di_seq *m_dht_in_sequence;
-  int *m_temperature_buffer;
-  int *m_humidity_buffer;
-  bool *m_invalid_buffer;
-  uint32_t *m_timestamp_buffer;
-  int m_max_buffer_size;
-  int m_buffer_idx;
-  bool m_force_reading;
-  void (*m_force_reading_cb)(void *param);
-  void *m_force_reading_param;
-  bool m_reading_ongoing;
+  uint8_t _data[5];
+  int _pin;
+  Dht_type _type;
+  int _poll_interval;
+  os_timer_t _poll_timer;
+  struct do_seq *_dht_out_sequence;
+  struct di_seq *_dht_in_sequence;
+  int *_temperature_buffer;
+  int *_humidity_buffer;
+  bool *_invalid_buffer;
+  uint32_t *_timestamp_buffer;
+  int _max_buffer_size;
+  int _buffer_idx;
+  bool _force_reading;
+  void (*_force_reading_cb)(void *param);
+  void *_force_reading_param;
+  bool _reading_ongoing;
 };
 
 #endif

@@ -38,24 +38,24 @@ public:
 
   // this is private but into public section
   // for easy access from timer callback functions
-  int m_id;
-  uint16_t m_data;
-  int m_cs;
-  int m_sck;
-  int m_so;
-  int m_bit_counter;
-  os_timer_t m_read_timer;
-  int m_poll_interval;
-  os_timer_t m_poll_timer;
-  int *m_temperature_buffer;
-  uint32_t *m_timestamp_buffer;
-  bool *m_invalid_buffer;
-  int m_max_buffer_size;
-  int m_buffer_idx;
-  bool m_force_reading;
-  void (*m_force_reading_cb)(void *param);
-  void *m_force_reading_param;
-  bool m_reading_ongoing;
+  int _id;
+  uint16_t _data;
+  int _cs;
+  int _sck;
+  int _so;
+  int _bit_counter;
+  os_timer_t _read_timer;
+  int _poll_interval;
+  os_timer_t _poll_timer;
+  int *_temperature_buffer;
+  uint32_t *_timestamp_buffer;
+  bool *_invalid_buffer;
+  int _max_buffer_size;
+  int _buffer_idx;
+  bool _force_reading;
+  void (*_force_reading_cb)(void *param);
+  void *_force_reading_param;
+  bool _reading_ongoing;
 };
 
 #endif

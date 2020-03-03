@@ -69,6 +69,24 @@
         },
         {
             "type": "shell",
+            "label": "flash user1.bin",
+            "command": "source ${workspaceFolder}/env.sh && make -e APP=1 flash",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "flash user2.bin",
+            "command": "source ${workspaceFolder}/env.sh && make -e APP=2 flash",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
             "label": "erase flash",
             "command": "source ${workspaceFolder}/env.sh && make flash_erase",
             "options": {

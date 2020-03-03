@@ -15,10 +15,12 @@ extern "C"
 #include "esp8266_io.h"
 }
 
+#include "espbot_cron.hpp"
 #include "espbot_global.hpp"
 #include "app.hpp"
-#include "app_activity_log.hpp"
-#include "app_cron.hpp"
+#include "app_event_codes.h"
+#include "app_remote_log.hpp"
+#include "app_temp_control.hpp"
 #include "app_temp_log.hpp"
 
 static int temperature_log[TEMP_LOG_LENGTH];
@@ -27,23 +29,22 @@ static Dht *dht22;
 
 void temp_log_init(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_log_init");
     for (current_idx = 0; current_idx < TEMP_LOG_LENGTH; current_idx++)
         temperature_log[current_idx] = INVALID_TEMP;
     current_idx = 0;
     dht22 = new Dht(DHT_DATA, DHT22, DHT_TEMP_ID, DHT_HUMI_ID, 0, DHT_BUFFERS);
     if (dht22 == NULL)
-        esplog.error("%s: not enough heap for allocating a Dht class\n", __FUNCTION__);
+    {
+        esp_diag.error(TEMP_LOG_INIT_HEAP_EXHAUSTED);
+        ERROR("temp_log_init heap exhausted %d", sizeof(Dht));
+    }
 }
 
-void init_temperature_readings(void)
+// reading sensor results and logging locally and remotely
+static void temp_read_completed(void *param)
 {
-    temp_log_read();
-}
-
-static void temp_log_read_completed(void *param)
-{
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_read_completed");
     sensors_event_t event;
     os_memset(&event, 0, sizeof(sensors_event_t));
     dht22->temperature.getEvent(&event);
@@ -55,7 +56,7 @@ static void temp_log_read_completed(void *param)
         temperature_log[new_idx] = INVALID_TEMP;
     else
         temperature_log[new_idx] = (int)(event.temperature * 10);
-    esplog.trace("temperature (*10): %d\n", temperature_log[new_idx]);
+    DEBUG("temp_read_completed temperature (*10): %d", temperature_log[new_idx]);
     current_idx++;
     if (current_idx >= TEMP_LOG_LENGTH)
         current_idx = 0;
@@ -67,17 +68,33 @@ static void temp_log_read_completed(void *param)
     }
 }
 
+void init_temperature_readings(void)
+{
+    ALL("temp_log_read");
+    if (dht22)
+        dht22->temperature.force_reading(temp_read_completed, NULL);
+}
+
+// reading sensor results and scheduling temp_control_run
+static void temp_log_read_completed(void *param)
+{
+    ALL("temp_log_read_completed");
+    temp_read_completed(NULL);
+    subsequent_function(temp_control_run);
+}
+
+// periodic temperature reading
 void temp_log_read(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
-    esplog.trace("... reading temperature ...\n");
+    ALL("temp_log_read");
     if (dht22)
         dht22->temperature.force_reading(temp_log_read_completed, NULL);
 }
 
+// getting temperature readings from local log
 int get_temp(int idx)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("get_temp");
     if (idx >= TEMP_LOG_LENGTH)
         idx = 0;
     int reading_idx = current_idx - idx;

@@ -43,14 +43,41 @@ void cron_sync(void);
  * # |  |  |  |  |
  * # *  *  *  *  * funcntion
  * 
- * result: 0  -> ok
- *         !0 -> error code
+ * result: > 0  -> job id
+ *         < 0  -> error
  */
 
 int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(void));
 
-void init_current_time(void);
+/*
+ * delete job_id
+ */
+void cron_del_job(int job_id);
+
+/*
+ * get current time as struct date
+ */
 struct date *get_current_time(void);
 
+/*
+ * force initialization of current time before than cron execution
+ */
+void init_current_time(void);
+
+
+/*
+ * CONFIGURATION & PERSISTENCY
+ */
+void enable_cron(void);
+void start_cron(void);
+void disable_cron(void);
+void stop_cron(void);
+bool cron_enabled(void);
+int save_cron_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
+
+/*
+ * DEBUG
+ */
+void cron_print_jobs(void);
 
 #endif

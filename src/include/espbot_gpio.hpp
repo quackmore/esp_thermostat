@@ -33,7 +33,7 @@ private:
   int32_t m_gpio_config;
 
   // int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
-  // int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+  // int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
   //                                 // return CFG_REQUIRES_UPDATE when cfg require update
   //                                 // return CFG_ERROR otherwise
   // int save_cfg(void);             // return CFG_OK on success, otherwise CFG_ERROR

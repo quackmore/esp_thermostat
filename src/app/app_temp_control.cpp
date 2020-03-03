@@ -15,13 +15,14 @@ extern "C"
 #include "esp8266_io.h"
 }
 
+#include "espbot_cron.hpp"
 #include "espbot_config.hpp"
 #include "espbot_global.hpp"
 #include "espbot_utils.hpp"
 #include "app.hpp"
-#include "app_activity_log.hpp"
-#include "app_cron.hpp"
+#include "app_event_codes.h"
 #include "app_heater.hpp"
+#include "app_remote_log.hpp"
 #include "app_temp_log.hpp"
 #include "app_temp_control.hpp"
 
@@ -44,18 +45,16 @@ static struct _heater_vars
 
 void switch_on_heater(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
-    heater_vars.last_heater_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
+    heater_vars.last_heater_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
     heater_start();
-    esplog.debug("TEMP CTRL -> heater on\n");
+    DEBUG("TEMP CTRL -> heater on");
 }
 
 void switch_off_heater(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
-    heater_vars.last_heater_off = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
+    heater_vars.last_heater_off = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
     heater_stop();
-    esplog.debug("TEMP CTRL -> heater off\n");
+    DEBUG("TEMP CTRL -> heater off");
 }
 
 //
@@ -71,7 +70,6 @@ static struct _manual_ctrl_vars
 
 void ctrl_off(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
     // log ctrl mode changes
     if (ctrl_mode != MODE_OFF)
     {
@@ -81,14 +79,16 @@ void ctrl_off(void)
     ctrl_mode = MODE_OFF;
     if (is_heater_on())
         switch_off_heater();
-    uint32 time = esp_sntp.get_timestamp();
-    esplog.debug("TEMP CTRL -> OFF [%d] %s\n", time, esp_sntp.get_timestr(time));
+    uint32 time = get_current_time()->timestamp;
+    DEBUG("TEMP CTRL -> OFF [%d] %s", time, esp_time.get_timestr(time));
+    //
+    // writing to flash could interfere with reading DHT22 ?????
+    //
     save_cfg();
 }
 
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
 {
-    esplog.all("%s\n", __FUNCTION__);
     if (ctrl_mode != MODE_MANUAL)
     {
         struct date *current_time = get_current_time();
@@ -98,9 +98,9 @@ void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
     manual_ctrl_vars.heater_on_period = heater_on_period;
     manual_ctrl_vars.heater_off_period = heater_off_period;
     manual_ctrl_vars.stop_after = stop_after;
-    manual_ctrl_vars.started_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
+    manual_ctrl_vars.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
     switch_on_heater();
-    esplog.debug("TEMP CTRL -> MANUAL MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
+    DEBUG("TEMP CTRL -> MANUAL MODE [%d] %s", manual_ctrl_vars.started_on, esp_time.get_timestr(manual_ctrl_vars.started_on));
     save_cfg();
 }
 
@@ -115,7 +115,6 @@ static struct _auto_ctrl_vars
 
 void ctrl_auto(int set_point, int stop_after)
 {
-    esplog.all("%s\n", __FUNCTION__);
     // log ctrl mode changes
     if (ctrl_mode != MODE_AUTO)
     {
@@ -131,8 +130,8 @@ void ctrl_auto(int set_point, int stop_after)
     }
     auto_ctrl_vars.setpoint = set_point;
     auto_ctrl_vars.stop_after = stop_after;
-    auto_ctrl_vars.started_on = (esp_sntp.get_timestamp() / 60) * 60; // rounding to previous minute
-    esplog.debug("TEMP CTRL -> AUTO MODE [%d] %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
+    auto_ctrl_vars.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
+    DEBUG("TEMP CTRL -> AUTO MODE [%d] %s", manual_ctrl_vars.started_on, esp_time.get_timestr(manual_ctrl_vars.started_on));
     save_cfg();
 }
 
@@ -173,7 +172,7 @@ static void compute_auto_ctrl_vars(void)
             prev_val = current_temp;
         int idx;
         // DEBUG
-        // os_printf(">>> PID: Integral begin\n");
+        // fs_printf(">>> PID: Integral begin\n");
         for (idx = 0; idx < 60; idx++)
         {
             cur_val = get_temp(idx);
@@ -181,18 +180,18 @@ static void compute_auto_ctrl_vars(void)
             {
                 i_e += (auto_ctrl_vars.setpoint - prev_val);
                 // DEBUG
-                // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - prev_val));
+                // fs_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - prev_val));
             }
             else
             {
                 i_e += (auto_ctrl_vars.setpoint - cur_val);
                 // DEBUG
-                // os_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - cur_val));
+                // fs_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - cur_val));
                 prev_val = cur_val;
             }
         }
         // DEBUG
-        // os_printf("\n>>> PID: Integral end, i_e = %d\n", i_e);
+        // fs_printf("\n>>> PID: Integral end, i_e = %d\n", i_e);
         i_e /= 60;
     }
     // u(t) = Kp * e(t) + Kd * (d e(t)/dt) + Ki * Integral(0,t)(e(x)dx)
@@ -208,13 +207,13 @@ static void compute_auto_ctrl_vars(void)
         auto_ctrl_vars.heater_on_period = adv_settings.heater_on_min;
     auto_ctrl_vars.heater_off_period = adv_settings.heater_on_off - auto_ctrl_vars.heater_on_period;
     // DEBUG
-    // os_printf(">>> PID:              e(t): %d\n", e_t);
-    // os_printf(">>> PID:         d e(t)/dt: %d\n", de_dt);
-    // os_printf(">>> PID: I(t-60,t) e(x) dx: %d\n", i_e);
-    // os_printf(">>> PID:              u(t): %d\n", (adv_settings.kp * e_t + adv_settings.kd * de_dt + adv_settings.ki * i_e));
-    // os_printf(">>> PID:   normalized u(t): %d\n", u_t);
-    // os_printf(">>> PID:   heater on timer: %d\n", auto_ctrl_vars.heater_on_period);
-    // os_printf(">>> PID:  heater off timer: %d\n", auto_ctrl_vars.heater_off_period);
+    // fs_printf(">>> PID:              e(t): %d\n", e_t);
+    // fs_printf(">>> PID:         d e(t)/dt: %d\n", de_dt);
+    // fs_printf(">>> PID: I(t-60,t) e(x) dx: %d\n", i_e);
+    // fs_printf(">>> PID:              u(t): %d\n", (adv_settings.kp * e_t + adv_settings.kd * de_dt + adv_settings.ki * i_e));
+    // fs_printf(">>> PID:   normalized u(t): %d\n", u_t);
+    // fs_printf(">>> PID:   heater on timer: %d\n", auto_ctrl_vars.heater_on_period);
+    // fs_printf(">>> PID:  heater off timer: %d\n", auto_ctrl_vars.heater_off_period);
 
     // WARM-UP
     // during warm-up the heater-on and heater-off timers are replaced with adv_settings.heater_on_min
@@ -228,7 +227,7 @@ static void compute_auto_ctrl_vars(void)
     }
     if ((current_time->timestamp - warm_up_started_on) < (adv_settings.warm_up_period * 60))
     {
-        esplog.debug("%s: warm-up phase\n", __FUNCTION__);
+        DEBUG("WARM-UP PHASE");
         auto_ctrl_vars.heater_on_period = adv_settings.wup_heater_on;
         auto_ctrl_vars.heater_off_period = adv_settings.wup_heater_off;
     }
@@ -236,17 +235,18 @@ static void compute_auto_ctrl_vars(void)
 
 // CRTL settings management
 
-static char *ctrl_settings_filename = "ctrl_settings.cfg";
+#define CTRL_SETTINGS_FILENAME f_str("ctrl_settings.cfg")
 
 static bool restore_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_restore_cfg");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_cfg FS not available");
         return false;
     }
-    File_to_json cfgfile(ctrl_settings_filename);
+    File_to_json cfgfile(CTRL_SETTINGS_FILENAME);
     if (!cfgfile.exists())
         return false;
     //  {
@@ -258,32 +258,36 @@ static bool restore_cfg(void)
     //  }
 
     // ctrl_mode
-    if (cfgfile.find_string("ctrl_mode"))
+    if (cfgfile.find_string(f_str("ctrl_mode")))
     {
-        esplog.error("%s - cannot find \"ctrl_mode\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+        ERROR("temp_control_restore_cfg cannot find \"ctrl_mode\"");
         return false;
     }
     ctrl_mode = atoi(cfgfile.get_value());
     if (ctrl_mode == MODE_MANUAL)
     {
         // manual_pulse_on
-        if (cfgfile.find_string("manual_pulse_on"))
+        if (cfgfile.find_string(f_str("manual_pulse_on")))
         {
-            esplog.error("%s - cannot find \"manual_pulse_on\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+            ERROR("temp_control_restore_cfg cannot find \"manual_pulse_on\"");
             return false;
         }
         manual_ctrl_vars.heater_on_period = atoi(cfgfile.get_value());
         // manual_pulse_off
-        if (cfgfile.find_string("manual_pulse_off"))
+        if (cfgfile.find_string(f_str("manual_pulse_off")))
         {
-            esplog.error("%s - cannot find \"manual_pulse_off\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+            ERROR("temp_control_restore_cfg cannot find \"manual_pulse_off\"");
             return false;
         }
         manual_ctrl_vars.heater_off_period = atoi(cfgfile.get_value());
         // pwr_off_timer
-        if (cfgfile.find_string("pwr_off_timer"))
+        if (cfgfile.find_string(f_str("pwr_off_timer")))
         {
-            esplog.error("%s - cannot find \"pwr_off_timer\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+            ERROR("temp_control_restore_cfg cannot find \"pwr_off_timer\"");
             return false;
         }
         manual_ctrl_vars.stop_after = atoi(cfgfile.get_value());
@@ -291,16 +295,18 @@ static bool restore_cfg(void)
     if (ctrl_mode == MODE_AUTO)
     {
         // auto_setpoint
-        if (cfgfile.find_string("auto_setpoint"))
+        if (cfgfile.find_string(f_str("auto_setpoint")))
         {
-            esplog.error("%s - cannot find \"auto_setpoint\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+            ERROR("temp_control_restore_cfg cannot find \"auto_setpoint\"");
             return false;
         }
         auto_ctrl_vars.setpoint = atoi(cfgfile.get_value());
         // pwr_off_timer
-        if (cfgfile.find_string("pwr_off_timer"))
+        if (cfgfile.find_string(f_str("pwr_off_timer")))
         {
-            esplog.error("%s - cannot find \"pwr_off_timer\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+            ERROR("temp_control_restore_cfg cannot find \"pwr_off_timer\"");
             return false;
         }
         auto_ctrl_vars.stop_after = atoi(cfgfile.get_value());
@@ -310,13 +316,14 @@ static bool restore_cfg(void)
 
 static bool saved_cfg_not_updated(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_saved_cfg_not_updated");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_saved_cfg_not_updated FS not available");
         return true;
     }
-    File_to_json cfgfile(ctrl_settings_filename);
+    File_to_json cfgfile(CTRL_SETTINGS_FILENAME);
     if (!cfgfile.exists())
         return true;
     //  {
@@ -327,9 +334,10 @@ static bool saved_cfg_not_updated(void)
     //    pwr_off_timer: int      4 digits
     //  }
     // ctrl_mode
-    if (cfgfile.find_string("ctrl_mode"))
+    if (cfgfile.find_string(f_str("ctrl_mode")))
     {
-        esplog.error("%s - cannot find \"ctrl_mode\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_cfg_not_updated cannot find \"ctrl_mode\"");
         return true;
     }
     if (ctrl_mode != atoi(cfgfile.get_value()))
@@ -337,25 +345,28 @@ static bool saved_cfg_not_updated(void)
     if (ctrl_mode == MODE_MANUAL)
     {
         // manual_pulse_on
-        if (cfgfile.find_string("manual_pulse_on"))
+        if (cfgfile.find_string(f_str("manual_pulse_on")))
         {
-            esplog.error("%s - cannot find \"manual_pulse_on\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("temp_control_saved_cfg_not_updated cannot find \"manual_pulse_on\"");
             return true;
         }
         if (manual_ctrl_vars.heater_on_period != atoi(cfgfile.get_value()))
             return true;
         // manual_pulse_off
-        if (cfgfile.find_string("manual_pulse_off"))
+        if (cfgfile.find_string(f_str("manual_pulse_off")))
         {
-            esplog.error("%s - cannot find \"manual_pulse_off\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("temp_control_saved_cfg_not_updated cannot find \"manual_pulse_off\"");
             return true;
         }
         if (manual_ctrl_vars.heater_off_period != atoi(cfgfile.get_value()))
             return true;
         // pwr_off_timer
-        if (cfgfile.find_string("pwr_off_timer"))
+        if (cfgfile.find_string(f_str("pwr_off_timer")))
         {
-            esplog.error("%s - cannot find \"pwr_off_timer\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("temp_control_saved_cfg_not_updated cannot find \"pwr_off_timer\"");
             return true;
         }
         if (manual_ctrl_vars.stop_after != atoi(cfgfile.get_value()))
@@ -364,17 +375,19 @@ static bool saved_cfg_not_updated(void)
     if (ctrl_mode == MODE_AUTO)
     {
         // auto_setpoint
-        if (cfgfile.find_string("auto_setpoint"))
+        if (cfgfile.find_string(f_str("auto_setpoint")))
         {
-            esplog.error("%s - cannot find \"auto_setpoint\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("temp_control_saved_cfg_not_updated cannot find \"auto_setpoint\"");
             return true;
         }
         if (manual_ctrl_vars.heater_on_period != atoi(cfgfile.get_value()))
             return true;
         // pwr_off_timer
-        if (cfgfile.find_string("pwr_off_timer"))
+        if (cfgfile.find_string(f_str("pwr_off_timer")))
         {
-            esplog.error("%s - cannot find \"pwr_off_timer\"\n", __FUNCTION__);
+            esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("temp_control_saved_cfg_not_updated cannot find \"pwr_off_timer\"");
             return true;
         }
         if (auto_ctrl_vars.stop_after != atoi(cfgfile.get_value()))
@@ -385,35 +398,38 @@ static bool saved_cfg_not_updated(void)
 
 static void remove_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_remove_cfg");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_REMOVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_remove_cfg FS not available");
         return;
     }
-    if (Ffile::exists(&espfs, ctrl_settings_filename))
+    if (Ffile::exists(&espfs, (char *)CTRL_SETTINGS_FILENAME))
     {
-        Ffile cfgfile(&espfs, ctrl_settings_filename);
+        Ffile cfgfile(&espfs, (char *)CTRL_SETTINGS_FILENAME);
         cfgfile.remove();
     }
 }
 
 static void save_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_save_cfg");
     if (saved_cfg_not_updated())
         remove_cfg();
     else
         return;
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_save_cfg FS not available");
         return;
     }
-    Ffile cfgfile(&espfs, ctrl_settings_filename);
+    Ffile cfgfile(&espfs, (char *)CTRL_SETTINGS_FILENAME);
     if (!cfgfile.is_available())
     {
-        esplog.error("%s - cannot open %s\n", __FUNCTION__, ctrl_settings_filename);
+        esp_diag.error(TEMP_CTRL_SAVE_CFG_CANNOT_OPEN_FILE);
+        ERROR("temp_control_save_cfg cannot open %s", CTRL_SETTINGS_FILENAME);
         return;
     }
     //  {
@@ -428,7 +444,7 @@ static void save_cfg(void)
     {
         //  {"ctrl_mode": }
         char buffer[(15 + 1 + 1)];
-        os_sprintf(buffer,
+        fs_sprintf(buffer,
                    "{\"ctrl_mode\": %d}",
                    ctrl_mode);
         cfgfile.n_append(buffer, os_strlen(buffer));
@@ -437,10 +453,14 @@ static void save_cfg(void)
     {
         //  {"ctrl_mode": ,"manual_pulse_on": ,"manual_pulse_off": ,"pwr_off_timer": }
         char buffer[(74 + 1 + 5 + 5 + 5 + 1)];
-        os_sprintf(buffer,
-                   "{\"ctrl_mode\": %d,\"manual_pulse_on\": %d,\"manual_pulse_off\": %d,\"pwr_off_timer\": %d}",
+        fs_sprintf(buffer,
+                   "{\"ctrl_mode\": %d,"
+                   "\"manual_pulse_on\": %d,",
                    ctrl_mode,
-                   manual_ctrl_vars.heater_on_period,
+                   manual_ctrl_vars.heater_on_period);
+        fs_sprintf(buffer + os_strlen(buffer),
+                   "\"manual_pulse_off\": %d,"
+                   "\"pwr_off_timer\": %d}",
                    manual_ctrl_vars.heater_off_period,
                    manual_ctrl_vars.stop_after);
         cfgfile.n_append(buffer, os_strlen(buffer));
@@ -449,7 +469,7 @@ static void save_cfg(void)
     {
         //  {"ctrl_mode": ,"auto_setpoint": ,"pwr_off_timer": }
         char buffer[(51 + 1 + 5 + 5 + 1)];
-        os_sprintf(buffer,
+        fs_sprintf(buffer,
                    "{\"ctrl_mode\": %d,\"auto_setpoint\": %d,\"pwr_off_timer\": %d}",
                    ctrl_mode,
                    auto_ctrl_vars.setpoint,
@@ -460,17 +480,18 @@ static void save_cfg(void)
 
 // ADVANCED CRTL settings management
 
-static char *adv_ctrl_settings_filename = "adv_ctrl_settings.cfg";
+#define ADV_CTRL_SETTINGS_FILENAME f_str("adv_ctrl_settings.cfg")
 
 static bool restore_adv_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_restore_adv_cfg");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg FS not available");
         return false;
     }
-    File_to_json cfgfile(adv_ctrl_settings_filename);
+    File_to_json cfgfile(ADV_CTRL_SETTINGS_FILENAME);
     if (!cfgfile.exists())
         return false;
     // {
@@ -488,79 +509,90 @@ static bool restore_adv_cfg(void)
     // }
 
     // kp
-    if (cfgfile.find_string("kp"))
+    if (cfgfile.find_string(f_str("kp")))
     {
-        esplog.error("%s - cannot find \"kp\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"kp\"");
         return false;
     }
     adv_settings.kp = atoi(cfgfile.get_value());
     // kd
-    if (cfgfile.find_string("kd"))
+    if (cfgfile.find_string(f_str("kd")))
     {
-        esplog.error("%s - cannot find \"kd\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"kd\"");
         return false;
     }
     adv_settings.kd = atoi(cfgfile.get_value());
     // ki
-    if (cfgfile.find_string("ki"))
+    if (cfgfile.find_string(f_str("ki")))
     {
-        esplog.error("%s - cannot find \"ki\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"ki\"");
         return false;
     }
     adv_settings.ki = atoi(cfgfile.get_value());
     // u_max
-    if (cfgfile.find_string("u_max"))
+    if (cfgfile.find_string(f_str("u_max")))
     {
-        esplog.error("%s - cannot find \"u_max\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"u_max\"");
         return false;
     }
     adv_settings.u_max = atoi(cfgfile.get_value());
     // heater_on_min
-    if (cfgfile.find_string("heater_on_min"))
+    if (cfgfile.find_string(f_str("heater_on_min")))
     {
-        esplog.error("%s - cannot find \"heater_on_min\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"heater_on_min\"");
         return false;
     }
     adv_settings.heater_on_min = atoi(cfgfile.get_value());
     // heater_on_max
-    if (cfgfile.find_string("heater_on_max"))
+    if (cfgfile.find_string(f_str("heater_on_max")))
     {
-        esplog.error("%s - cannot find \"heater_on_max\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"heater_on_max\"");
         return false;
     }
     adv_settings.heater_on_max = atoi(cfgfile.get_value());
     // heater_on_off
-    if (cfgfile.find_string("heater_on_off"))
+    if (cfgfile.find_string(f_str("heater_on_off")))
     {
-        esplog.error("%s - cannot find \"heater_on_off\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"heater_on_off\"");
         return false;
     }
     adv_settings.heater_on_off = atoi(cfgfile.get_value());
     // heater_cold
-    if (cfgfile.find_string("heater_cold"))
+    if (cfgfile.find_string(f_str("heater_cold")))
     {
-        esplog.error("%s - cannot find \"heater_cold\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"heater_cold\"");
         return false;
     }
     adv_settings.heater_cold = atoi(cfgfile.get_value());
     // warm_up_period
-    if (cfgfile.find_string("warm_up_period"))
+    if (cfgfile.find_string(f_str("warm_up_period")))
     {
-        esplog.error("%s - cannot find \"warm_up_period\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"warm_up_period\"");
         return false;
     }
     adv_settings.warm_up_period = atoi(cfgfile.get_value());
     // wup_heater_on
-    if (cfgfile.find_string("wup_heater_on"))
+    if (cfgfile.find_string(f_str("wup_heater_on")))
     {
-        esplog.error("%s - cannot find \"wup_heater_on\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"wup_heater_on\"");
         return false;
     }
     adv_settings.wup_heater_on = atoi(cfgfile.get_value());
     // wup_heater_off
-    if (cfgfile.find_string("wup_heater_off"))
+    if (cfgfile.find_string(f_str("wup_heater_off")))
     {
-        esplog.error("%s - cannot find \"wup_heater_off\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"wup_heater_off\"");
         return false;
     }
     adv_settings.wup_heater_off = atoi(cfgfile.get_value());
@@ -569,13 +601,14 @@ static bool restore_adv_cfg(void)
 
 static bool saved_adv_cfg_not_updated(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_saved_adv_cfg_not_updated");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_FS_NOT_AVAILABLE);
+        ERROR("temp_control_saved_adv_cfg_not_updated FS not available");
         return true;
     }
-    File_to_json cfgfile(adv_ctrl_settings_filename);
+    File_to_json cfgfile(ADV_CTRL_SETTINGS_FILENAME);
     if (!cfgfile.exists())
         return true;
     // {
@@ -593,89 +626,100 @@ static bool saved_adv_cfg_not_updated(void)
     // }
 
     // kp
-    if (cfgfile.find_string("kp"))
+    if (cfgfile.find_string(f_str("kp")))
     {
-        esplog.error("%s - cannot find \"kp\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"kp\"");
         return true;
     }
     if (adv_settings.kp != atoi(cfgfile.get_value()))
         return true;
     // kd
-    if (cfgfile.find_string("kd"))
+    if (cfgfile.find_string(f_str("kd")))
     {
-        esplog.error("%s - cannot find \"kd\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"kd\"");
         return true;
     }
     if (adv_settings.kd != atoi(cfgfile.get_value()))
         return true;
     // ki
-    if (cfgfile.find_string("ki"))
+    if (cfgfile.find_string(f_str("ki")))
     {
-        esplog.error("%s - cannot find \"ki\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"ki\"");
         return true;
     }
     if (adv_settings.ki != atoi(cfgfile.get_value()))
         return true;
     // u_max
-    if (cfgfile.find_string("u_max"))
+    if (cfgfile.find_string(f_str("u_max")))
     {
-        esplog.error("%s - cannot find \"u_max\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"u_max\"");
         return true;
     }
     if (adv_settings.u_max != atoi(cfgfile.get_value()))
         return true;
     // heater_on_min
-    if (cfgfile.find_string("heater_on_min"))
+    if (cfgfile.find_string(f_str("heater_on_min")))
     {
-        esplog.error("%s - cannot find \"heater_on_min\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"heater_on_min\"");
         return true;
     }
     if (adv_settings.heater_on_min != atoi(cfgfile.get_value()))
         return true;
     // heater_on_max
-    if (cfgfile.find_string("heater_on_max"))
+    if (cfgfile.find_string(f_str("heater_on_max")))
     {
-        esplog.error("%s - cannot find \"heater_on_max\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"heater_on_max\"");
         return true;
     }
     if (adv_settings.heater_on_max != atoi(cfgfile.get_value()))
         return true;
     // heater_on_off
-    if (cfgfile.find_string("heater_on_off"))
+    if (cfgfile.find_string(f_str("heater_on_off")))
     {
-        esplog.error("%s - cannot find \"heater_on_off\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"heater_on_off\"");
         return true;
     }
     if (adv_settings.heater_on_off != atoi(cfgfile.get_value()))
         return true;
     // heater_cold
-    if (cfgfile.find_string("heater_cold"))
+    if (cfgfile.find_string(f_str("heater_cold")))
     {
-        esplog.error("%s - cannot find \"heater_cold\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"heater_cold\"");
         return true;
     }
     if (adv_settings.heater_cold != atoi(cfgfile.get_value()))
         return true;
     // warm_up_period
-    if (cfgfile.find_string("warm_up_period"))
+    if (cfgfile.find_string(f_str("warm_up_period")))
     {
-        esplog.error("%s - cannot find \"warm_up_period\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"warm_up_period\"");
         return true;
     }
     if (adv_settings.warm_up_period != atoi(cfgfile.get_value()))
         return true;
     // wup_heater_on
-    if (cfgfile.find_string("wup_heater_on"))
+    if (cfgfile.find_string(f_str("wup_heater_on")))
     {
-        esplog.error("%s - cannot find \"wup_heater_on\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"wup_heater_on\"");
         return true;
     }
     if (adv_settings.wup_heater_on != atoi(cfgfile.get_value()))
         return true;
     // wup_heater_off
-    if (cfgfile.find_string("wup_heater_off"))
+    if (cfgfile.find_string(f_str("wup_heater_off")))
     {
-        esplog.error("%s - cannot find \"wup_heater_off\"\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"wup_heater_off\"");
         return true;
     }
     if (adv_settings.wup_heater_off != atoi(cfgfile.get_value()))
@@ -685,35 +729,38 @@ static bool saved_adv_cfg_not_updated(void)
 
 static void remove_adv_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_remove_adv_cfg");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_REMOVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_remove_adv_cfg FS not available");
         return;
     }
-    if (Ffile::exists(&espfs, adv_ctrl_settings_filename))
+    if (Ffile::exists(&espfs, (char *)ADV_CTRL_SETTINGS_FILENAME))
     {
-        Ffile cfgfile(&espfs, adv_ctrl_settings_filename);
+        Ffile cfgfile(&espfs, (char *)ADV_CTRL_SETTINGS_FILENAME);
         cfgfile.remove();
     }
 }
 
 static void save_adv_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_save_adv_cfg");
     if (saved_adv_cfg_not_updated())
         remove_adv_cfg();
     else
         return;
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(TEMP_CTRL_SAVE_ADV_CFG_FS_NOT_AVAILABLE);
+        ERROR("temp_control_save_adv_cfg FS not available");
         return;
     }
-    Ffile cfgfile(&espfs, adv_ctrl_settings_filename);
+    Ffile cfgfile(&espfs, (char *)ADV_CTRL_SETTINGS_FILENAME);
     if (!cfgfile.is_available())
     {
-        esplog.error("%s - cannot open %s\n", __FUNCTION__, adv_ctrl_settings_filename);
+        esp_diag.error(TEMP_CTRL_SAVE_ADV_CFG_CANNOT_OPEN_FILE);
+        ERROR("temp_control_save_adv_cfg cannot open %s", ADV_CTRL_SETTINGS_FILENAME);
         return;
     }
     // {
@@ -732,26 +779,28 @@ static void save_adv_cfg(void)
 
     // {"kp": ,"kd": ,"ki": ,"u_max": ,"heater_on_min": ,"heater_on_max": ,"heater_on_off": ,"heater_cold": ,"warm_up_period": ,"wup_heater_on": ,"wup_heater_off": }
     char buffer[(158 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1)];
-    os_sprintf(buffer,
+    fs_sprintf(buffer,
                "{\"kp\": %d,"
                "\"kd\": %d,"
                "\"ki\": %d,"
                "\"u_max\": %d,"
-               "\"heater_on_min\": %d,"
-               "\"heater_on_max\": %d,"
-               "\"heater_on_off\": %d,"
-               "\"heater_cold\": %d,"
-               "\"warm_up_period\": %d,"
-               "\"wup_heater_on\": %d,"
-               "\"wup_heater_off\": %d}",
+               "\"heater_on_min\": %d,",
                adv_settings.kp,
                adv_settings.kd,
                adv_settings.ki,
                adv_settings.u_max,
-               adv_settings.heater_on_min,
+               adv_settings.heater_on_min);
+    fs_sprintf(buffer + os_strlen(buffer),
+               "\"heater_on_max\": %d,"
+               "\"heater_on_off\": %d,"
+               "\"heater_cold\": %d,",
                adv_settings.heater_on_max,
                adv_settings.heater_on_off,
-               adv_settings.heater_cold,
+               adv_settings.heater_cold);
+    fs_sprintf(buffer + os_strlen(buffer),
+               "\"warm_up_period\": %d,"
+               "\"wup_heater_on\": %d,"
+               "\"wup_heater_off\": %d}",
                adv_settings.warm_up_period,
                adv_settings.wup_heater_on,
                adv_settings.wup_heater_off);
@@ -783,7 +832,7 @@ struct _adv_ctrl_settings *get_adv_ctrl_settings(void)
 
 void temp_control_init(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_init");
     // heater
     heater_vars.last_heater_on = 0;
     heater_vars.last_heater_off = 0;
@@ -809,6 +858,8 @@ void temp_control_init(void)
     {
         // CTRL DEFAULT
         ctrl_off();
+        esp_diag.warn(TEMP_CTRL_INIT_DEFAULT_CTRL_CFG);
+        WARN("temp_control_init no ctrl cfg available");
     }
 
     if (!restore_adv_cfg())
@@ -824,12 +875,14 @@ void temp_control_init(void)
         adv_settings.warm_up_period = WARM_UP_PERIOD;
         adv_settings.wup_heater_on = CTRL_HEATER_ON_WUP;
         adv_settings.wup_heater_off = CTRL_HEATER_OFF_WUP;
+        esp_diag.info(TEMP_CTRL_INIT_DEFAULT_ADV_CTRL_CFG);
+        INFO("temp_control_init no adv ctrl cfg available");
     }
 }
 
 void temp_control_manual(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_manual");
     struct date *current_time = get_current_time();
 
     // switch off timer management (if enabled)
@@ -864,7 +917,7 @@ void temp_control_manual(void)
 
 void temp_control_auto(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("temp_control_auto");
     struct date *current_time = get_current_time();
     // switch off timer management (if enabled)
     if (auto_ctrl_vars.stop_after > 0)
@@ -917,29 +970,29 @@ void temp_control_auto(void)
 
 void temp_control_run(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
-    esplog.debug("CTRL STATUS ------------------------------------------\n");
-    esplog.debug("   CTRL MODE -> %d\n", ctrl_mode);
+    DEBUG("CTRL STATUS at [%d] %s", get_current_time()->timestamp, esp_time.get_timestr(get_current_time()->timestamp));
     switch (ctrl_mode)
     {
     case MODE_OFF:
+        DEBUG("   CTRL MODE OFF");
         if (is_heater_on())
             switch_off_heater();
         break;
     case MODE_MANUAL:
+        DEBUG("   CTRL MODE MANUAL (since [%d] %s)", manual_ctrl_vars.started_on, esp_time.get_timestr(manual_ctrl_vars.started_on));
         temp_control_manual();
-        esplog.debug("  started on -> %d %s\n", manual_ctrl_vars.started_on, esp_sntp.get_timestr(manual_ctrl_vars.started_on));
         break;
     case MODE_AUTO:
+        DEBUG("   CTRL MODE AUTO (since [%d] %s)", auto_ctrl_vars.started_on, esp_time.get_timestr(auto_ctrl_vars.started_on));
         temp_control_auto();
-        esplog.debug("  started on -> %d %s\n", auto_ctrl_vars.started_on, esp_sntp.get_timestr(auto_ctrl_vars.started_on));
         break;
     default:
         break;
     }
-    esplog.debug("      HEATER -> %d\n", is_heater_on());
-    esplog.debug(" switched on -> %d %s\n", heater_vars.last_heater_on, esp_sntp.get_timestr(heater_vars.last_heater_on));
-    esplog.debug("switched off -> %d %s\n", heater_vars.last_heater_off, esp_sntp.get_timestr(heater_vars.last_heater_off));
+    DEBUG("after ctrl, HEATER -> %d", is_heater_on());
+    DEBUG("  last switched on -> [%d] %s", heater_vars.last_heater_on, esp_time.get_timestr(heater_vars.last_heater_on));
+    DEBUG(" last switched off -> [%d] %s", heater_vars.last_heater_off, esp_time.get_timestr(heater_vars.last_heater_off));
+    subsequent_function(send_events_to_external_host);
 }
 
 int get_current_mode(void)

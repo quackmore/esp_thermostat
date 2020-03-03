@@ -15,14 +15,14 @@ extern "C"
 #include "esp8266_io.h"
 }
 
+#include "espbot_cron.hpp"
 #include "espbot_global.hpp"
 #include "library_dht.hpp"
 #include "app.hpp"
-#include "app_activity_log.hpp"
+#include "app_remote_log.hpp"
 #include "app_heater.hpp"
 #include "app_temp_log.hpp"
 #include "app_temp_control.hpp"
-#include "app_cron.hpp"
 
 /*
  *  APP_RELEASE is coming from git
@@ -38,65 +38,44 @@ char *app_release = APP_RELEASE;
 
 char *app_name = "THERMOSTAT";
 
-uint32 lastRebootTime;
-
 void app_init_before_wifi(void)
 {
-    lastRebootTime = 0;
     init_dio_task();
     heater_init();
     temp_log_init();
-    init_activity_logger();
-    cron_init();
+    init_remote_logger();
+    temp_control_init();
+    // don't wait a full minute before updating
+    // the current time and temperature reading
+    // cause a browser could require it for visualization...
+    // init_current_time();
+    //    init_temperature_readings();
     cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read);
-    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run);
-    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, send_events_to_external_host);
+    // cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run);
+    // cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, send_events_to_external_host);
     // cron_add_job(2, 0, CRON_STAR, CRON_STAR, CRON_STAR, check_ota, NULL);
 }
 
-os_timer_t delay_after_wifi;
+os_timer_t thermostat_start_timer;
 
-// give some time to sntp to setup everything ...
-void app_init_after_wifi_delayed(void)
+void thermostat_start(void)
 {
-    static bool first_time = true;
-    if (first_time)
-    {
-        lastRebootTime = esp_sntp.get_timestamp();
-        temp_control_init();
-
-        // don't wait a full minute before updating
-        // the current time and temperature reading
-        // cause a browser could require it for visualization...
-        init_current_time();
-        init_temperature_readings();
-
-        // sntp is ready now, start cron
-        cron_sync();
-        first_time = false;
-    }
+    init_temperature_readings();
+    cron_sync();
 }
 
 void app_init_after_wifi(void)
 {
-    esp_mDns.start(espbot.get_name());
-    os_timer_disarm(&delay_after_wifi);
-    os_timer_setfn(&delay_after_wifi, (os_timer_func_t *)app_init_after_wifi_delayed, NULL);
-    os_timer_arm(&delay_after_wifi, 5000, 0);
-
     static bool first_time = true;
     if (first_time)
     {
         first_time = false;
+        os_timer_disarm(&thermostat_start_timer);
+        os_timer_setfn(&thermostat_start_timer, (os_timer_func_t *)thermostat_start, NULL);
+        os_timer_arm(&thermostat_start_timer, 2000, 0);
     }
-}
-
-uint32 get_last_reboot_date(void)
-{
-    return lastRebootTime;
 }
 
 void app_deinit_on_wifi_disconnect()
 {
-    esp_mDns.stop();
 }

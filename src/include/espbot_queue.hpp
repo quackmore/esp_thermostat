@@ -10,28 +10,6 @@
 #ifndef __QUEUE_HPP__
 #define __QUEUE_HPP__
 
-#ifdef ESPBOT
-
-#define PRINT_FATAL(...) esplog.fatal(__VA_ARGS__)
-#define PRINT_ERROR(...) esplog.error(__VA_ARGS__)
-#define PRINT_WARN(...) esplog.warn(__VA_ARGS__)
-#define PRINT_INFO(...) esplog.info(__VA_ARGS__)
-#define PRINT_DEBUG(...) esplog.debug(__VA_ARGS__)
-#define PRINT_TRACE(...) esplog.trace(__VA_ARGS__)
-#define PRINT_ALL(...) esplog.all(__VA_ARGS__)
-
-#else
-
-#define PRINT_FATAL(...) printf(__VA_ARGS__)
-#define PRINT_ERROR(...) printf(__VA_ARGS__)
-#define PRINT_WARN(...) printf(__VA_ARGS__)
-#define PRINT_INFO(...) printf(__VA_ARGS__)
-#define PRINT_DEBUG(...) printf(__VA_ARGS__)
-#define PRINT_TRACE(...) printf(__VA_ARGS__)
-#define PRINT_ALL(...) printf(__VA_ARGS__)
-
-#endif
-
 typedef enum
 {
   Queue_ok = 0,

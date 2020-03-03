@@ -16,12 +16,14 @@ extern "C"
 }
 
 #include "app.hpp"
+#include "app_event_codes.h"
+#include "app_remote_log.hpp"
 #include "espbot_config.hpp"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
+#include "espbot_mem_macros.h"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
-#include "app_activity_log.hpp"
 
 //
 // remote host configuration
@@ -35,31 +37,34 @@ static struct
     char *path;
 } remote_log_vars;
 
-static char *filename = "remote_log.cfg";
+#define REMOTE_LOG_FILENAME f_str("remote_log.cfg")
 
 static bool restore_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("remote_log_restore_cfg");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(REMOTELOG_RESTORE_CFG_FS_NOT_AVAILABLE);
+        ERROR("remote_log_restore_cfg FS not available");
         return false;
     }
-    File_to_json cfgfile(filename);
+    File_to_json cfgfile(REMOTE_LOG_FILENAME);
     if (cfgfile.exists())
     {
         // "{"enabled": ,"host": "","port": ,"path": ""}",
         // enabled
-        if (cfgfile.find_string("enabled"))
+        if (cfgfile.find_string(f_str("enabled")))
         {
-            esplog.error("%s - cannot find \"enabled\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
+            ERROR("remote_log_restore_cfg cannot find \"enabled\"");
             return false;
         }
         remote_log_vars.enabled = atoi(cfgfile.get_value());
         // host
-        if (cfgfile.find_string("host"))
+        if (cfgfile.find_string(f_str("host")))
         {
-            esplog.error("%s - cannot find \"host\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
+            ERROR("remote_log_restore_cfg cannot find \"host\"");
             return false;
         }
         if (remote_log_vars.host)
@@ -67,16 +72,18 @@ static bool restore_cfg(void)
         remote_log_vars.host = new char[os_strlen(cfgfile.get_value()) + 1];
         os_strcpy(remote_log_vars.host, cfgfile.get_value());
         // port
-        if (cfgfile.find_string("port"))
+        if (cfgfile.find_string(f_str("port")))
         {
-            esplog.error("%s - cannot find \"port\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
+            ERROR("remote_log_restore_cfg cannot find \"port\"");
             return false;
         }
         remote_log_vars.port = atoi(cfgfile.get_value());
         // path
-        if (cfgfile.find_string("path"))
+        if (cfgfile.find_string(f_str("path")))
         {
-            esplog.error("%s - cannot find \"path\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
+            ERROR("remote_log_restore_cfg cannot find \"path\"");
             return false;
         }
         if (remote_log_vars.path)
@@ -90,44 +97,49 @@ static bool restore_cfg(void)
 
 static bool saved_cfg_not_updated(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("remote_log_saved_cfg_not_updated");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_FS_NOT_AVAILABLE);
+        ERROR("remote_log_saved_cfg_not_updated FS not available");
         return true;
     }
-    File_to_json cfgfile(filename);
+    File_to_json cfgfile(REMOTE_LOG_FILENAME);
     if (cfgfile.exists())
     {
         // "{"enabled": ,"host": "","port": ,"path": ""}",
         // enabled
-        if (cfgfile.find_string("enabled"))
+        if (cfgfile.find_string(f_str("enabled")))
         {
-            esplog.error("%s - cannot find \"enabled\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("remote_log_saved_cfg_not_updated cannot find \"enabled\"");
             return true;
         }
         if (remote_log_vars.enabled != atoi(cfgfile.get_value()))
             return true;
         // host
-        if (cfgfile.find_string("host"))
+        if (cfgfile.find_string(f_str("host")))
         {
-            esplog.error("%s - cannot find \"host\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("remote_log_saved_cfg_not_updated cannot find \"host\"");
             return true;
         }
         if (0 != os_strcmp(remote_log_vars.host, cfgfile.get_value()))
             return true;
         // port
-        if (cfgfile.find_string("port"))
+        if (cfgfile.find_string(f_str("port")))
         {
-            esplog.error("%s - cannot find \"port\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("remote_log_saved_cfg_not_updated cannot find \"port\"");
             return true;
         }
         if (remote_log_vars.port != atoi(cfgfile.get_value()))
             return true;
         // path
-        if (cfgfile.find_string("path"))
+        if (cfgfile.find_string(f_str("path")))
         {
-            esplog.error("%s - cannot find \"path\"\n", __FUNCTION__);
+            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("remote_log_saved_cfg_not_updated cannot find \"path\"");
             return true;
         }
         if (0 != os_strcmp(remote_log_vars.path, cfgfile.get_value()))
@@ -140,47 +152,51 @@ static bool saved_cfg_not_updated(void)
 
 static void remove_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("remote_log_remove_cfg");
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(REMOTELOG_REMOVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("remote_log_remove_cfg FS not available");
         return;
     }
-    if (Ffile::exists(&espfs, filename))
+    if (Ffile::exists(&espfs, (char *)REMOTE_LOG_FILENAME))
     {
-        Ffile cfgfile(&espfs, filename);
+        Ffile cfgfile(&espfs, (char *)REMOTE_LOG_FILENAME);
         cfgfile.remove();
     }
 }
 
 static void save_cfg(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("remote_log_save_cfg");
     if (saved_cfg_not_updated())
         remove_cfg();
     else
         return;
     if (!espfs.is_available())
     {
-        esplog.error("%s - file system not available\n", __FUNCTION__);
+        esp_diag.error(REMOTELOG_SAVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("remote_log_save_cfg FS not available");
         return;
     }
-    Ffile cfgfile(&espfs, filename);
+    Ffile cfgfile(&espfs, (char *)REMOTE_LOG_FILENAME);
     if (!cfgfile.is_available())
     {
-        esplog.error("%s - cannot open %s\n", __FUNCTION__, filename);
+        esp_diag.error(REMOTELOG_SAVE_CFG_CANNOT_OPEN_FILE);
+        ERROR("remote_log_save_cfg cannot open %s", REMOTE_LOG_FILENAME);
         return;
     }
     int file_len = 44 + 1 + os_strlen(remote_log_vars.host) + 5 + os_strlen(remote_log_vars.path) + 1;
     Heap_chunk buffer(file_len);
     if (buffer.ref == NULL)
     {
-        esplog.error("%s - not enough heap memory available (%d)\n", __FUNCTION__, file_len);
+        esp_diag.error(REMOTELOG_SAVE_CFG_HEAP_EXHAUSTED);
+        ERROR("remote_log_save_cfg heap exausted %d", file_len);
         return;
     }
 
     // "{"enabled": ,"host": "","port": ,"path": ""}",
-    os_sprintf(buffer.ref,
+    fs_sprintf(buffer.ref,
                "{\"enabled\": %d,\"host\": \"%s\",\"port\": %d,\"path\": \"%s\"}",
                remote_log_vars.enabled,
                remote_log_vars.host,
@@ -229,19 +245,19 @@ char *get_remote_log_path(void)
 // event log mngmt
 //
 
-static struct activity_event events[ACTIVITY_LOG_LENGTH];
-static bool event_sent[ACTIVITY_LOG_LENGTH];
+static struct activity_event events[REMOTE_LOG_LENGTH];
+static bool event_sent[REMOTE_LOG_LENGTH];
 static int last_event_idx;
 
 void print_last_events(void);
 
 static Webclnt *espclient;
 
-void init_activity_logger(void)
+void init_remote_logger(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("init_remote_logger");
     int idx;
-    for (idx = 0; idx < ACTIVITY_LOG_LENGTH; idx++)
+    for (idx = 0; idx < REMOTE_LOG_LENGTH; idx++)
     {
         events[idx].timestamp = 0;
         events[idx].type = none;
@@ -254,9 +270,11 @@ void init_activity_logger(void)
     if (!restore_cfg())
     {
         remote_log_vars.enabled = false;
-        remote_log_vars.host = NULL;
+        remote_log_vars.host = (char *)f_str("");
         remote_log_vars.port = 0;
-        remote_log_vars.path = NULL;
+        remote_log_vars.path = (char *)f_str("");
+        esp_diag.info(APP_REMOTELOG_INIT_DEFAULT_CFG);
+        INFO("init_remote_logger no cfg available");
     }
 
     espclient = new Webclnt;
@@ -264,9 +282,9 @@ void init_activity_logger(void)
 
 void log_event(uint32 timestamp, activity_event_t type, int value)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("log_event");
     last_event_idx++;
-    if (last_event_idx >= ACTIVITY_LOG_LENGTH)
+    if (last_event_idx >= REMOTE_LOG_LENGTH)
         last_event_idx = 0;
     events[last_event_idx].timestamp = timestamp;
     events[last_event_idx].type = type;
@@ -277,7 +295,7 @@ void log_event(uint32 timestamp, activity_event_t type, int value)
 
 int events_count(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("events_count");
     int count = 0;
     int idx = last_event_idx;
     while (events[idx].type != none)
@@ -287,7 +305,7 @@ int events_count(void)
         idx--;
         // check if event array boundary have been reached
         if (idx < 0)
-            idx = ACTIVITY_LOG_LENGTH - 1;
+            idx = REMOTE_LOG_LENGTH - 1;
         // check if it's back to last recorded event
         if (idx == last_event_idx)
             break;
@@ -297,15 +315,15 @@ int events_count(void)
 
 struct activity_event *get_event(int idx)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("get_event");
     int tmp_index = last_event_idx;
     int ii;
-    idx %= ACTIVITY_LOG_LENGTH;
+    idx %= REMOTE_LOG_LENGTH;
     for (ii = 0; ii < idx; ii++)
     {
         tmp_index--;
         if (tmp_index < 0)
-            tmp_index = ACTIVITY_LOG_LENGTH - 1;
+            tmp_index = REMOTE_LOG_LENGTH - 1;
     }
     return &events[tmp_index];
 }
@@ -318,32 +336,32 @@ os_timer_t delay_post;
 
 static int get_next_event_to_be_sent(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("get_next_event_to_be_sent");
     int event_idx = last_event_idx;
     while (event_sent[event_idx])
     {
         event_idx -= 1;
         if (event_idx < 0)
-            event_idx = ACTIVITY_LOG_LENGTH - 1;
+            event_idx = REMOTE_LOG_LENGTH - 1;
         if (event_idx == last_event_idx)
             return -1;
     }
     return event_idx;
 }
 
-void post_info(void *param);
+static void post_info(void *param);
 
-void check_answer(void *param)
+static void check_answer(void *param)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("remote_log_check_answer");
     switch (espclient->get_status())
     {
     case WEBCLNT_RESPONSE_READY:
-        espclient->update_status(WEBCLNT_CONNECTED);
         if (espclient->parsed_response->http_code != HTTP_OK)
         {
             // POST failed
-            esplog.error("POST failed (host answered %d, %s)\n", espclient->parsed_response->http_code, espclient->parsed_response->body);
+            ERROR("remote_log_check_answer unexpected host answer %d, %s", espclient->parsed_response->http_code, espclient->parsed_response->body);
+            espclient->disconnect(NULL, NULL);
         }
         else
         {
@@ -351,10 +369,10 @@ void check_answer(void *param)
             // mark event as sent
             int event_idx = (int)param;
             event_sent[event_idx] = true;
-            esplog.trace("%s: marking event %d as sent\n", __FUNCTION__, event_idx);
+            TRACE("remote_log_check_answer marking event %d as sent", event_idx);
             // check if there are any unsent events
             event_idx = get_next_event_to_be_sent();
-            esplog.trace("%s: next event to be sent: %d\n", __FUNCTION__, event_idx);
+            TRACE("remote_log_check_answer next event to be sent: %d", event_idx);
             if (event_idx > 0)
             {
                 // to avoid unnecessary stack growth
@@ -371,15 +389,15 @@ void check_answer(void *param)
         }
         break;
     default:
-        esplog.error("%s - Ops ... webclient status is %d\n", __FUNCTION__, espclient->get_status());
+        ("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
         break;
     }
 }
 
-void post_info(void *param)
+static void post_info(void *param)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("remote_log_post_info");
     switch (espclient->get_status())
     {
     case WEBCLNT_CONNECTED:
@@ -388,36 +406,44 @@ void post_info(void *param)
 
         // {"timestamp":4294967295,"type":1,"value":1234}
         char event_str[47];
-        os_sprintf(event_str,
+        fs_sprintf(event_str,
                    "{\"timestamp\":%d,\"type\":%d,\"value\":%d}",
                    events[event_idx].timestamp,
                    events[event_idx].type,
                    events[event_idx].value);
-        esplog.trace("%s: event str: %s\n", __FUNCTION__, event_str);
+        TRACE("remote_log_post_info event str: %s", event_str);
 
         // "POST  HTTP/1.1rnHost: 111.111.111.111rnContent-Type: application/jsonrnAccept: */*rnConnection: keep-alivernContent-Length: 47rnrn{"timestamp":4294967295,"type":1,"value":1234}rn"
-        char *msg = new char[178 + os_strlen(remote_log_vars.path)];
-        os_sprintf(msg,
+        int msg_len = 178 + os_strlen(remote_log_vars.path);
+        Heap_chunk msg(msg_len);
+        if (msg.ref == NULL)
+        {
+            ERROR("remote_log_post_info - heap exausted [%d]", msg_len);
+            esp_ota.set_status(OTA_FAILED);
+            espclient->disconnect(NULL, NULL);
+            break;
+        }
+        fs_sprintf(msg.ref,
                    "POST %s HTTP/1.1\r\n"
                    "Host: %s\r\n"
-                   "Content-Type: application/json\r\n"
+                   "Content-Type: application/json\r\n",
+                   remote_log_vars.path,
+                   remote_log_vars.host);
+        fs_sprintf((msg.ref + os_strlen(msg.ref)),
                    "Accept: */*\r\n"
                    "Connection: keep-alive\r\n"
                    "Content-Length: %d\r\n\r\n"
                    "%s\r\n",
-                   remote_log_vars.path,
-                   remote_log_vars.host,
                    os_strlen(event_str),
                    event_str);
-        esplog.trace("%s: POSTing str: %s\n", __FUNCTION__, msg);
-        esplog.trace("%s: event %d was sent\n", __FUNCTION__, event_idx);
-        espclient->send_req(msg, check_answer, (void *)event_idx);
-        delete[] msg;
+        TRACE("remote_log_post_info POSTing str: %s", msg.ref);
+        TRACE("remote_log_post_info event %d was sent", event_idx);
+        espclient->send_req(msg.ref, os_strlen(msg.ref), check_answer, (void *)event_idx);
     }
     break;
     default:
     {
-        esplog.error("%s - Ops ... webclient status is %d\n", __FUNCTION__, espclient->get_status());
+        ERROR("remote_log_post_info unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
     }
     break;
@@ -426,7 +452,7 @@ void post_info(void *param)
 
 void send_events_to_external_host(void)
 {
-    esplog.all("%s\n", __FUNCTION__);
+    ALL("send_events_to_external_host");
 
     if (remote_log_vars.enabled)
     {
@@ -434,7 +460,7 @@ void send_events_to_external_host(void)
         atoipaddr(&host_ip, remote_log_vars.host);
 
         int event_idx = get_next_event_to_be_sent();
-        esplog.trace("%s: event to be sent: %d\n", __FUNCTION__, event_idx);
+        TRACE("send_events_to_external_host event to be sent: %d", event_idx);
         if (event_idx < 0)
             // there are no unsent events
             return;
@@ -445,14 +471,13 @@ void send_events_to_external_host(void)
 void print_last_events(void)
 {
     // this is just for debug, never called
-    esplog.all("%s\n", __FUNCTION__);
     int idx;
     struct activity_event *event_ptr;
-    os_printf("EVENTS BEGIN\n");
+    fs_printf("EVENTS BEGIN");
     for (idx = 0; idx < 10; idx++)
     {
         event_ptr = get_event(idx);
-        os_printf("%d - %d - %d - %d - [%d] - (%d)\n",
+        fs_printf("%d - %d - %d - %d - [%d] - (%d)\n",
                   idx,
                   event_ptr->timestamp,
                   event_ptr->type,
@@ -460,5 +485,5 @@ void print_last_events(void)
                   ((event_ptr - &events[0]) / sizeof(struct activity_event)),
                   event_sent[idx]);
     }
-    os_printf("EVENTS END\n");
+    fs_printf("EVENTS END\n");
 }

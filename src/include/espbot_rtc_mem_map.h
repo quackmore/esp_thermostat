@@ -6,21 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __APP_TEMP_LOG_HPP__
-#define __APP_TEMP_LOG_HPP__
+#ifndef __RTC_MEM_MAP_H__
+#define __RTC_MEM_MAP_H__
 
-//#define DHT_DATA ESPBOT_D5
-#define DHT_DATA ESPBOT_D2
-#define DHT_TEMP_ID 50000
-#define DHT_HUMI_ID 51000
-#define DHT_BUFFERS 1
+#include "espbot_timedate.h"
 
-#define TEMP_LOG_LENGTH 60
-#define INVALID_TEMP -500
-
-void temp_log_init(void);
-void init_temperature_readings(void);
-void temp_log_read(void);
-int get_temp(int idx);
+// espbot RTC mem usage
+#define RTC_MEM_START 64
+#define RTC_TIMEDATE (RTC_MEM_START)
+// end of espbot RTC mem usage
+#define RTC_FREE (RTC_TIMEDATE + sizeof(struct espbot_time))
 
 #endif

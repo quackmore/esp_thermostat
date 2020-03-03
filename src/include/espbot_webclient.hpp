@@ -61,6 +61,7 @@ public:
   os_timer_t m_send_req_timeout_timer;
 
   char *request;
+  int req_len;
   Http_parsed_response *parsed_response;
 
   // connect will temporary change webclient status to WEBCLNT_CONNECTING
@@ -83,7 +84,7 @@ public:
   // WEBCLNT_CONNECTED
   // WEBCLNT_CONNECT_TIMEOUT
   // WEBCLNT_DISCONNECTED (??) not sure so just in case
-  void send_req(char *msg, void (*completed_func)(void *), void *param);
+  void send_req(char *msg, int msg_len, void (*completed_func)(void *), void *param);
 
   Webclnt_status_type get_status(void);
 
@@ -96,13 +97,15 @@ public:
 
 /* 
 
-   EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE
+EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE EXAMPLE
 
-// code structure using callbacks
-// 1) create web client
-// 2) connect (once connected or timeout call get_info)
-// 3) get_info: send request (on answer or timeout call check_info)
-// 4) check_info: on completion disconnect (one disconnected delete web client)
+code structure using callbacks
+1) create web client
+2) connect (once connected or timeout call get_info)
+3) get_info: send request (on answer or timeout call check_info)
+4) check_info: on completion disconnect (one disconnected delete web client)
+
+static Webclnt *espclient;
 
 void free_client(void *)
 {
@@ -116,11 +119,12 @@ void check_info(void *param)
     case WEBCLNT_RESPONSE_READY:
         if (espclient->parsed_response->body)
         {
-            // Server responded: espclient->parsed_response->body
-            // do something ...
+            Server responded: espclient->parsed_response->body
+            do something ...
         }
         break;
     default:
+        Ops ... webclient status is not what expected [espclient->get_status()]
         os_printf("wc_get_version: Ops ... webclient status is %d\n", espclient->get_status());
         break;
     }
@@ -135,18 +139,21 @@ void get_info(void *param)
         espclient->send_req(<client_request>, check_info, NULL);
         break;
     default:
-        // Ops ... webclient status is not what expected [espclient->get_status()]
+        Ops ... webclient status is not what expected [espclient->get_status()]
+        os_printf("wc_get_version: Ops ... webclient status is %d\n", espclient->get_status());
         espclient->disconnect(free_client, NULL);
         break;
     }
 }
 
+void whatever(void)
 {
     ...
-    Webclnt *espclient = new Webclnt;
+    espclient = new Webclnt;
     espclient->connect(<host_ip>, <host_port>, get_info, NULL);
+    
     ...
 }
 
- */
+*/
 #endif

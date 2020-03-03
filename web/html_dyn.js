@@ -1,4 +1,140 @@
-import * as esp from "./esp_queries.js";
+const esp8266 = {
+  "url": "http://192.168.1.105",
+  // "url": "http://192.168.1.185",
+  "cors": true
+  // "url": "",
+  // "cors": false
+};
+
+function get_current_vars(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/temp_ctrl_vars',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    //success: success_cb(data),
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+  // let data = {
+  //   ctrl_date: 1573157694,
+  //   current_temp: 200,
+  //   heater_status: 0,
+  //   auto_setpoint: 200,
+  //   ctrl_mode: 2,
+  //   pwr_off_timer_started_on: 1573206000,
+  //   pwr_off_timer: 90
+  // };
+  // success_cb(data);
+}
+
+function get_settings(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/temp_ctrl_settings',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+  // let data = {
+  //   ctrl_mode: 1,
+  //   manual_pulse_on: 0,
+  //   manual_pulse_off: 0,
+  //   auto_setpoint: 200,
+  //   pwr_off_timer: 30
+  // };
+  // success_cb(data);
+}
+
+function save_settings(get_data, success_cb, error_cb) {
+  $.ajax({
+    type: 'POST',
+    url: esp8266.url + '/api/temp_ctrl_settings',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(get_data()),
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  })
+}
+
+function get_rl_settings(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/remote_log_settings',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+}
+
+function save_rl_settings(get_data, success_cb, error_cb) {
+  $.ajax({
+    type: 'POST',
+    url: esp8266.url + '/api/remote_log_settings',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(get_data()),
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  })
+}
+
+function get_adv_ctrl_settings(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/temp_ctrl_adv_settings',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+}
+
+function save_adv_ctrl_settings(get_data, success_cb, error_cb) {
+  $.ajax({
+    type: 'POST',
+    url: esp8266.url + '/api/temp_ctrl_adv_settings',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(get_data()),
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  })
+}
 
 //  CURRENT VALUES
 
@@ -13,7 +149,7 @@ $('#collapseCurrent').on('show.bs.collapse', function () {
 });
 
 function update_collapseCurrent() {
-  esp.get_current_vars(update_current_vars, function (xhr) {
+  get_current_vars(update_current_vars, function (xhr) {
     alert("" + xhr.responseText);
   });
 }
@@ -102,7 +238,7 @@ $('#settings_reset').click(function () {
 });
 
 $('#settings_save').click(function () {
-  esp.save_settings(jsonify_settings,
+  save_settings(jsonify_settings,
     function (xhr) {
       alert("" + xhr.responseText);
     }, function (xhr) {
@@ -111,7 +247,7 @@ $('#settings_save').click(function () {
 });
 
 function update_collapseSettings() {
-  esp.get_settings(update_settings, function (xhr) {
+  get_settings(update_settings, function (xhr) {
     alert("" + xhr.responseText);
   });
 }
@@ -190,19 +326,19 @@ function jsonify_settings() {
 // ADVANCED CONTROL SETTINGS
 
 $('#collapseAdvSettings').on('show.bs.collapse', function () {
-  esp.get_adv_ctrl_settings(update_advCtrlSettings, function (xhr) {
+  get_adv_ctrl_settings(update_advCtrlSettings, function (xhr) {
     alert("" + xhr.responseText);
   });
 });
 
 $('#adv_settings_reset').click(function () {
-  esp.get_adv_ctrl_settings(update_advCtrlSettings, function (xhr) {
+  get_adv_ctrl_settings(update_advCtrlSettings, function (xhr) {
     alert("" + xhr.responseText);
   });
 });
 
 $('#adv_settings_save').click(function () {
-  esp.save_adv_ctrl_settings(jsonify_advCtrlSettings,
+  save_adv_ctrl_settings(jsonify_advCtrlSettings,
     function (xhr) {
       alert("" + xhr.responseText);
     }, function (xhr) {
@@ -243,19 +379,19 @@ function jsonify_advCtrlSettings() {
 // REMOTE LOG SETTINGS
 
 $('#collapseRemoteLogSettings').on('show.bs.collapse', function () {
-  esp.get_rl_settings(update_remoteLogSettings, function (xhr) {
+  get_rl_settings(update_remoteLogSettings, function (xhr) {
     alert("" + xhr.responseText);
   });
 });
 
 $('#rl_reset').click(function () {
-  esp.get_rl_settings(update_remoteLogSettings, function (xhr) {
+  get_rl_settings(update_remoteLogSettings, function (xhr) {
     alert("" + xhr.responseText);
   });
 });
 
 $('#rl_save').click(function () {
-  esp.save_rl_settings(jsonify_rl_settings,
+  save_rl_settings(jsonify_rl_settings,
     function (xhr) {
       alert("" + xhr.responseText);
     }, function (xhr) {
@@ -280,4 +416,97 @@ function jsonify_rl_settings() {
   to_be_saved_rl_settings.port = parseInt($('#rl_port').val());
   to_be_saved_rl_settings.path = $('#rl_path').val();
   return to_be_saved_rl_settings;
+}
+
+// DIAGNOSTIC EVENTS
+$('#collapseDiagnosticEvents').on('show.bs.collapse', function () {
+  update_diag_events();
+});
+
+$('#diag_e_ack').on('click', function () {
+  esp_ack_diag_events(function (xhr) {
+    alert("" + xhr);
+  }, function (xhr) {
+    alert("" + JSON.parse(xhr.responseText).error.reason);
+  });
+  update_diag_events();
+});
+
+$('#diag_e_refresh').on('click', function () {
+  update_diag_events();
+});
+
+function esp_ack_diag_events(success_cb, error_cb) {
+  $.ajax({
+    type: 'POST',
+    url: esp8266.url + '/api/diag/ack_events',
+    crossDomain: esp8266.cors,
+    success: function (xhr) {
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  })
+}
+
+function esp_get_diag_events(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/diag/events',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+}
+
+function update_diag_events() {
+  esp_get_diag_events(update_diag_events_table, function (xhr) {
+    alert("" + JSON.parse(xhr.responseText).error.reason);
+  });
+}
+
+function get_diag_events(success_cb, error_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/diag/events',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (xhr) {
+      error_cb(xhr);
+    }
+  });
+}
+
+function update_diag_events_table(data) {
+  $("#diag_event_table").empty();
+  $("#diag_event_table").append('<thead><tr><th scope="col">Timestamp</th><th scope="col">Type</th><th scope="col">Code</th><th scope="col">Desc</th><th scope="col">Value</th></tr></thead><tbody>');
+  for (var ii = 0; ii < data.diag_events.length; ii++) {
+    let ts = new Date(data.diag_events[ii].ts * 1000);
+    if (data.diag_events[ii].ack == 1) {
+      $("#diag_event_table").append('<tr class="text-success"><td>' + ts.toString().substring(4, 24) + '</td><td>' + get_evnt_str(data.diag_events[ii].type) + '</td><td>' + String("0000" + data.diag_events[ii].code).slice(-4) + '</td><td>' + get_code_str(data.diag_events[ii].code) + '</td><td>' + data.diag_events[ii].val + '</td></tr>');
+    }
+    else {
+      $("#diag_event_table").append('<tr><td>' + ts.toString().substring(4, 24) + '</td><td>' + get_evnt_str(data.diag_events[ii].type) + '</td><td>' + String("0000" + data.diag_events[ii].code).slice(-4) + '</td><td>' + get_code_str(data.diag_events[ii].code) + '</td><td>' + data.diag_events[ii].val + '</td></tr>');
+    }
+  }
+  $("#diag_event_table").append('</tbody>');
+}
+
+function get_evnt_str(type) {
+  var evnt_str = [];
+  evnt_str[parseInt(1, 16)] = "FATAL";
+  evnt_str[parseInt(2, 16)] = "ERROR";
+  evnt_str[parseInt(4, 16)] = "WARN";
+  evnt_str[parseInt(8, 16)] = "INFO";
+  evnt_str[parseInt(10, 16)] = "DEBUG";
+  evnt_str[parseInt(20, 16)] = "TRACE";
+  return evnt_str[parseInt(type, 16)];
 }

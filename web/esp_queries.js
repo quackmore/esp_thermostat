@@ -1,8 +1,9 @@
 const esp8266 = {
+  "url": "http://192.168.1.105",
   // "url": "http://192.168.1.185",
-  // "cors": true
-  "url": "",
-  "cors": false
+  "cors": true
+  // "url": "",
+  // "cors": false
 };
 
 function get_current_vars(success_cb, error_cb) {
@@ -134,5 +135,3 @@ function save_adv_ctrl_settings(get_data, success_cb, error_cb) {
     }
   })
 }
-
-export { get_current_vars, get_settings, save_settings, get_rl_settings, save_rl_settings, get_adv_ctrl_settings, save_adv_ctrl_settings };
