@@ -1,9 +1,9 @@
 const esp8266 = {
-  "url": "http://192.168.1.105",
+  // "url": "http://192.168.1.105",
   // "url": "http://192.168.1.185",
-  "cors": true
-  // "url": "",
-  // "cors": false
+  // "cors": true
+  "url": "",
+  "cors": false
 };
 
 function get_current_vars(success_cb, error_cb) {
@@ -141,6 +141,9 @@ function save_adv_ctrl_settings(get_data, success_cb, error_cb) {
 setInterval(update_collapseCurrent, 15000);
 
 $(document).ready(function () {
+  setTimeout(function () {
+    $('.modal').modal('hide');
+  }, 500);
   update_collapseCurrent();
 });
 

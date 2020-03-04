@@ -273,7 +273,7 @@ void init_remote_logger(void)
         remote_log_vars.host = (char *)f_str("");
         remote_log_vars.port = 0;
         remote_log_vars.path = (char *)f_str("");
-        esp_diag.info(APP_REMOTELOG_INIT_DEFAULT_CFG);
+        esp_diag.info(REMOTELOG_INIT_DEFAULT_CFG);
         INFO("init_remote_logger no cfg available");
     }
 
@@ -360,6 +360,7 @@ static void check_answer(void *param)
         if (espclient->parsed_response->http_code != HTTP_OK)
         {
             // POST failed
+            esp_diag.error(REMOTELOG_CHECK_ANSWER_UNEXPECTED_HOST_ANSWER, espclient->parsed_response->http_code);
             ERROR("remote_log_check_answer unexpected host answer %d, %s", espclient->parsed_response->http_code, espclient->parsed_response->body);
             espclient->disconnect(NULL, NULL);
         }
@@ -389,7 +390,8 @@ static void check_answer(void *param)
         }
         break;
     default:
-        ("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
+        esp_diag.error(REMOTELOG_CHECK_ANSWER_UNEXPECTED_CLIENT_STATUS, espclient->get_status());
+        ERROR("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
         break;
     }
@@ -401,6 +403,7 @@ static void post_info(void *param)
     switch (espclient->get_status())
     {
     case WEBCLNT_CONNECTED:
+    case WEBCLNT_RESPONSE_READY:
     {
         int event_idx = (int)param;
 
@@ -418,6 +421,7 @@ static void post_info(void *param)
         Heap_chunk msg(msg_len);
         if (msg.ref == NULL)
         {
+            esp_diag.error(REMOTELOG_POST_INFO_HEAP_EXHAUSTED, msg_len);
             ERROR("remote_log_post_info - heap exausted [%d]", msg_len);
             esp_ota.set_status(OTA_FAILED);
             espclient->disconnect(NULL, NULL);
@@ -443,6 +447,7 @@ static void post_info(void *param)
     break;
     default:
     {
+        esp_diag.error(REMOTELOG_POST_INFO_UNEXPECTED_CLIENT_STATUS, espclient->get_status());
         ERROR("remote_log_post_info unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
     }

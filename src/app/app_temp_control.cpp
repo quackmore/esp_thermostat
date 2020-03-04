@@ -876,7 +876,12 @@ void temp_control_init(void)
         adv_settings.wup_heater_on = CTRL_HEATER_ON_WUP;
         adv_settings.wup_heater_off = CTRL_HEATER_OFF_WUP;
         esp_diag.info(TEMP_CTRL_INIT_DEFAULT_ADV_CTRL_CFG);
-        INFO("temp_control_init no adv ctrl cfg available");
+        INFO("temp_control_init using default adv ctrl cfg");
+    }
+    else
+    {
+        esp_diag.info(TEMP_CTRL_INIT_CUSTOM_ADV_CTRL_CFG);
+        INFO("temp_control_init using custom advanced ctrl cfg");
     }
 }
 
