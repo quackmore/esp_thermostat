@@ -27,7 +27,7 @@ extern "C"
 #define EVNT_TRACE 0x20
 #define EVNT_ALL 0x40
 
-#define EVNT_QUEUE_SIZE 40 // 40 * sizeof(strut dia_event) => 480 bytes
+#define EVNT_QUEUE_SIZE 100 // 100 * sizeof(strut dia_event) => 1200 bytes
 
 #define DIA_LED ESPBOT_D4
 
