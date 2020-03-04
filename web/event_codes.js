@@ -28,6 +28,7 @@ code_str[parseInt("0A1C", 16)] = "TEMP_CTRL_SAVE_ADV_CFG_FS_NOT_AVAILABLE";
 code_str[parseInt("0A1D", 16)] = "TEMP_CTRL_SAVE_ADV_CFG_CANNOT_OPEN_FILE";
 code_str[parseInt("0A1E", 16)] = "TEMP_CTRL_INIT_DEFAULT_CTRL_CFG";
 code_str[parseInt("0A1F", 16)] = "TEMP_CTRL_INIT_DEFAULT_ADV_CTRL_CFG";
+code_str[parseInt("0A20", 16)] = "TEMP_CTRL_INIT_CUSTOM_ADV_CTRL_CFG";
 code_str[parseInt("0A30", 16)] = "TEMP_LOG_INIT_HEAP_EXHAUSTED";
 code_str[parseInt("0A40", 16)] = "APP_GET_API_INFO_HEAP_EXHAUSTED";
 code_str[parseInt("0A41", 16)] = "APP_GET_API_TEMP_CTRL_VARS_HEAP_EXHAUSTED";
