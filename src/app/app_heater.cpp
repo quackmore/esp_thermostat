@@ -22,8 +22,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 
-//#define HEATER_PIN ESPBOT_D2
-#define HEATER_PIN ESPBOT_D4
+#define HEATER_PIN ESPBOT_D2
 #define HEATER_ON ESPBOT_HIGH
 #define HEATER_OFF ESPBOT_LOW
 

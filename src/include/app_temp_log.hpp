@@ -9,8 +9,7 @@
 #ifndef __APP_TEMP_LOG_HPP__
 #define __APP_TEMP_LOG_HPP__
 
-//#define DHT_DATA ESPBOT_D5
-#define DHT_DATA ESPBOT_D2
+#define DHT_DATA ESPBOT_D5
 #define DHT_TEMP_ID 50000
 #define DHT_HUMI_ID 51000
 #define DHT_BUFFERS 1
