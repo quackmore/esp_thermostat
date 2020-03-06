@@ -7,9 +7,10 @@ Thermostat app based on [ESPBOT](https://github.com/quackmore/espbot_2.0) and [e
 The thermostat APP require a DHT-22 for temperature measurement (on pin D5) and a relay (on pin D2) for controlling an external heater.
 
 The thermostat APP has three working modes:
--OFF
--MANUAL: when working in manual mode the thermostat can keep the heater always ON or can cycle it ON and OFF regardless of the temperature readings.
--AUTO: when working in auto mode the thermostat will drive the heater trying to reach the temperature setpoint. A PID algorithm is used.
+
+- OFF
+- MANUAL: when working in manual mode the thermostat can keep the heater always ON or can cycle it ON and OFF regardless of the temperature readings.
+- AUTO: when working in auto mode the thermostat will drive the heater trying to reach the temperature setpoint. A PID algorithm is used.
 
 The thermostat APP can log any change in temperature reading, working mode and heater status to an external host using the following format:
 
@@ -21,7 +22,14 @@ The thermostat APP can log any change in temperature reading, working mode and h
     Content-Length: 47
     {"timestamp":4294967295,"type":1,"value":1234}
 
-The thermostat APP can be controlled using a web interface connecting to your_device_IP_address.
+  event types are:
+
+    1 - temperature value changed
+    2 - heater on/off
+    3 - control mode change
+    4 - temperature setpoint_change
+
+The thermostat APP hosts a web server and can be controlled by a web interface connecting your browser to your_device_IP_address.
 
 ## Building the APP
 
@@ -52,57 +60,98 @@ The thermostat APP can be controlled using a web interface connecting to your_de
 - Flash the boot running the command
 
       source ./env.sh && make flash_boot
+- Flash the application running the command
+
+      source ./env.sh && make -e APP=1 flash
+      source ./env.sh && make -e APP=2 flash
 
 ### Create a minimum configuration (and checkout some useful commands)
 
 - wifi connection: without configuration the ESP device will work as a Wifi AP with SSID=ESPBOT-chip_id and password=espbot123456
- 
+
       curl --location --request POST "http://{{host}}/api/wifi/cfg" \
       --data "{
-          \"station_ssid\": \"your_Wifi_SSID\",
-          \"station_pwd\": \"your_Wifi_password\"
+          "station_ssid": "your_Wifi_SSID",
+          "station_pwd": "your_Wifi_password"
       }"
-      this will make the device stop working as AP and connect to your Wifi AP
+  this will make the device stop working as AP and connect to your Wifi AP
 - device name (and SSID)
 
       curl --location --request POST "http://{{host}}/api/espbot/cfg" \
       --header "Content-Type: application/json" \
       --data "{
-          \"espbot_name\": \"your_device_name\"
+          "espbot_name": "your_device_name"
       }"
-- debug logger config
+- enable cron (will run temperature reading and control)
 
-      curl --location --request POST "http://{{host}}/api/debug/cfg" \
-      --header "Content-Type: application/json" \
+      curl --location --request POST "http://{{host}}/api/wifi/cfg" \
       --data "{
-          \"logger_serial_level\": your_level,
-          \"logger_memory_level\": your_level
+          \"station_ssid\": \"your_Wifi_SSID\",
+          \"station_pwd\": \"your_Wifi_passwordthermostat.local\"
       }"
-      logger levels:
-      0 OFF    no logging
-      1 FATAL  up to fatal events
-      2 ERROR  up to error events
-      3 WARN   up to warning events
-      4 INFO   up to information events
-      5 DEBUG  up to debug events
-      6 TRACE  up to trace events
-      7 ALL    all the events
+- enable mDns (if you want to access your device as <http://your_device_name.local>)
+
+      curl --location --request POST 'http://{{host}}/api/mdns' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "mdns_enabled": 1
+      }'
+- disable mDns (if you don't care)
+
+      curl --location --request POST 'http://{{host}}/api/mdns' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "mdns_enabled": 0
+      }'
+- setup SNTP and timezone
+
+      curl --location --request POST 'http://{{host}}/api/sntp' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "sntp_enabled": 1,
+          "timezone": your_time_zone
+      }'
+- setup diagnostic reporting
+
+      curl --location --request POST 'http://{{host}}/api/diag/cfg' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "diag_led_mask": 7,
+          "serial_log_mask": 31
+      }'
+
+  examples:
+
+      "diag_led_mask": FATAL | ERROR | WARN
+      will report that a fatal, error or warning event occurred by lighting the esp led (D4)
+      (acknowledging the events throught the web interface will turn off the led)
+
+  logger levels:
   
-  serial_levels state the information printed to the serial line (BIT_RATE_460800)
-  memory_levels state the information kept in memory, use following command to checkout the memory log:
+      0 OFF    no logging
+      1 FATAL  fatal events
+      2 ERROR  error events
+      4 WARN   warning events
+      8 INFO   information events
+      16 DEBUG debug events
+      32 TRACE trace events
+      64 ALL   all the events
+  
+  the serial_log_mask define which information is printed to the serial line (BIT_RATE_460800)
+  you can checkout the diagnostic configuration using
 
       curl --location --request GET "http://{{host}}/api/debug/log"
 - OTA upgrade
 
-      curl --location --request POST "http://{{host}}/api/ota/cfg" \
-      --header "Content-Type: application/json" \
-      --data "{
-          \"host\": \"your_server\",
-          \"port\": your_port,
-          \"path\": \"your_path\",
-          \"check_version\": \"false\",
-          \"reboot_on_completion\": \"true\"
-      }"
+      curl --location --request POST 'http://{{host}}/api/ota/cfg' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "host": "your_server",
+          "port": your_port,
+          "path": "your_path",
+          "check_version": "true",
+          "reboot_on_completion": "true"
+      }
 
   you will need a webserver where to place the user1.bin and user2.bin files
   the easiest way is using docker:
@@ -163,7 +212,7 @@ Use the [espUploadFile](https://github.com/quackmore/esp_utils) bash script to u
 - cd to web directory
 - run "espUploadFile 'your device IP address' index.html"
 - run "espUploadFile 'your device IP address' html_dyn.js"
-- run "espUploadFile 'your device IP address' esp_queries.js"
+- run "espUploadFile 'your device IP address' event_codes.js"
 
 ## License
 
