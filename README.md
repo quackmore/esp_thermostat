@@ -84,10 +84,9 @@ The thermostat APP hosts a web server and can be controlled by a web interface c
       }"
 - enable cron (will run temperature reading and control)
 
-      curl --location --request POST "http://{{host}}/api/wifi/cfg" \
+      curl --location --request POST "http://{{host}}/api/cron" \
       --data "{
-          \"station_ssid\": \"your_Wifi_SSID\",
-          \"station_pwd\": \"your_Wifi_passwordthermostat.local\"
+          "cron_enabled": 1
       }"
 - enable mDns (if you want to access your device as <http://your_device_name.local>)
 
