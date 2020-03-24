@@ -79,15 +79,16 @@ The thermostat APP hosts a web server and can be controlled by a web interface c
 
       curl --location --request POST "http://{{host}}/api/espbot/cfg" \
       --header "Content-Type: application/json" \
-      --data "{
+      --data-raw '{
           "espbot_name": "your_device_name"
-      }"
+      }'
 - enable cron (will run temperature reading and control)
 
       curl --location --request POST "http://{{host}}/api/cron" \
-      --data "{
+      --header "Content-Type: application/json" \
+      --data-raw '{
           "cron_enabled": 1
-      }"
+      }'
 - enable mDns (if you want to access your device as <http://your_device_name.local>)
 
       curl --location --request POST 'http://{{host}}/api/mdns' \
