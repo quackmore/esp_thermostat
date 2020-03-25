@@ -12,6 +12,7 @@
 #define MODE_OFF 0
 #define MODE_MANUAL 1
 #define MODE_AUTO 2
+#define MODE_PROGRAM 3
 
 // control advanced setting
 #define CTRL_KP 1
@@ -45,6 +46,7 @@ void temp_control_init(void);
 void ctrl_off(void);
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after);
 void ctrl_auto(int set_point, int stop_after);
+void ctrl_program(int program_id);
 
 
 void temp_control_run(void);
@@ -58,6 +60,8 @@ uint32 get_pwr_off_timer_started_on(void);
 int get_auto_setpoint(void);
 int get_manual_pulse_on(void);
 int get_manual_pulse_off(void);
+int get_program_id(void);
+
 void set_adv_ctrl_settings(struct _adv_ctrl_settings *);
 struct _adv_ctrl_settings *get_adv_ctrl_settings(void);
 

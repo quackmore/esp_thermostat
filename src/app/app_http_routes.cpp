@@ -32,6 +32,7 @@ extern "C"
 #include "app_heater.hpp"
 #include "app_http_routes.hpp"
 #include "app_temp_control.hpp"
+#include "app_temp_ctrl_program.hpp"
 #include "app_temp_log.hpp"
 
 static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -72,20 +73,20 @@ static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     }
 }
 
-
 static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("get_api_temp_ctrl_vars");
     // {
     //   "ctrl_date": uint32,                 11 digits
-    //   "current_temp": int,                  4 digits
+    //   "current_temp": int,                  5 digits
     //   "heater_status": int,                 1 digit
     //   "auto_setpoint": int,                 4 digits
     //   "ctrl_mode": int,                     1 digit
+    //   "program_name": int,                 32 digit
     //   "pwr_off_timer_started_on": uint32,  11 digits
     //   "pwr_off_timer": int                  4 digits
     // }
-    int str_len = 137 + 11 + 4 + 1 + 4 + 1 + 11 + 4 + 1;
+    int str_len = 140 + 11 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
@@ -95,6 +96,7 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
         return;
     }
     struct date *current_time = get_current_time();
+    // {"ctrl_date":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":}
     fs_sprintf(msg.ref,
                "{\"ctrl_date\":%d,"
                "\"current_temp\":%d,"
@@ -104,9 +106,11 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
                (is_heater_on() ? 1 : 0));
     fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"auto_setpoint\":%d,"
-               "\"ctrl_mode\":%d,",
+               "\"ctrl_mode\":%d,"
+               "\"program_name\":\"%s\",",
                get_auto_setpoint(),
-               get_current_mode());
+               get_current_mode(),
+               get_cur_program_name(get_program_id()));
     fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"pwr_off_timer_started_on\":%d,"
                "\"pwr_off_timer\":%d}",
@@ -157,7 +161,7 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     //    manual_pulse_on: int,   4 digits
     //    manual_pulse_off: int,  4 digits
     //    auto_setpoint: int,     4 digits
-    //    pwr_off_timer: int      4 digits
+    //    powrr_off_timer: int    4 digits
     //  }
     //
     Json_str settings(parsed_req->req_content, parsed_req->content_len);
@@ -291,6 +295,9 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
         break;
     case MODE_AUTO:
         ctrl_auto(settings_auto_setpoint, settings_power_off_timer);
+        break;
+    case MODE_PROGRAM:
+        ctrl_program(settings_auto_setpoint);
         break;
     default:
         break;

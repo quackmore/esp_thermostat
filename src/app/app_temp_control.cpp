@@ -18,6 +18,7 @@ extern "C"
 #include "espbot_cron.hpp"
 #include "espbot_config.hpp"
 #include "espbot_global.hpp"
+#include "espbot_list.hpp"
 #include "espbot_utils.hpp"
 #include "app.hpp"
 #include "app_event_codes.h"
@@ -25,13 +26,7 @@ extern "C"
 #include "app_remote_log.hpp"
 #include "app_temp_log.hpp"
 #include "app_temp_control.hpp"
-
-//
-// CTRL
-//
-static int ctrl_mode; // off/manual/auto
-
-static void save_cfg(void);
+#include "app_temp_ctrl_program.hpp"
 
 //
 // heater mngmt
@@ -58,25 +53,36 @@ void switch_off_heater(void)
 }
 
 //
+// CTRL
+//
+
+static void save_cfg(void);
+
+static struct _ctrl_vars
+{
+    int mode;              // off/manual/auto/program
+    int program_id;        //
+    struct prgm *program;  //
+    int heater_on_period;  // minutes
+    int heater_off_period; // minutes
+    uint32 started_on;     // the timestamp when ctrl was started
+    int stop_after;        // minutes
+    int setpoint;          //
+} ctrl;
+
+//
 // MANUAL CTRL
 //
-static struct _manual_ctrl_vars
-{
-    int heater_on_period;  // minutes, 0 minutes -> continuos
-    int heater_off_period; // minutes
-    uint32 started_on;     // the timestamp when manual ctrl was started
-    int stop_after;        // minutes
-} manual_ctrl_vars;
 
 void ctrl_off(void)
 {
     // log ctrl mode changes
-    if (ctrl_mode != MODE_OFF)
+    if (ctrl.mode != MODE_OFF)
     {
         struct date *current_time = get_current_time();
         log_event(current_time->timestamp, mode_change, MODE_OFF);
     }
-    ctrl_mode = MODE_OFF;
+    ctrl.mode = MODE_OFF;
     if (is_heater_on())
         switch_off_heater();
     uint32 time = get_current_time()->timestamp;
@@ -89,50 +95,74 @@ void ctrl_off(void)
 
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
 {
-    if (ctrl_mode != MODE_MANUAL)
+    if (ctrl.mode != MODE_MANUAL)
     {
         struct date *current_time = get_current_time();
         log_event(current_time->timestamp, mode_change, MODE_MANUAL);
     }
-    ctrl_mode = MODE_MANUAL;
-    manual_ctrl_vars.heater_on_period = heater_on_period;
-    manual_ctrl_vars.heater_off_period = heater_off_period;
-    manual_ctrl_vars.stop_after = stop_after;
-    manual_ctrl_vars.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
+    ctrl.mode = MODE_MANUAL;
+    ctrl.heater_on_period = heater_on_period;
+    ctrl.heater_off_period = heater_off_period;
+    ctrl.stop_after = stop_after;
+    ctrl.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
     switch_on_heater();
-    DEBUG("TEMP CTRL -> MANUAL MODE [%d] %s", manual_ctrl_vars.started_on, esp_time.get_timestr(manual_ctrl_vars.started_on));
+    DEBUG("TEMP CTRL -> MANUAL MODE [%d] %s", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));
     save_cfg();
 }
-
-static struct _auto_ctrl_vars
-{
-    int setpoint;
-    uint32 started_on; // the timestamp when auto was started
-    int stop_after;    // power off timer in minutes
-    int heater_on_period;
-    int heater_off_period;
-} auto_ctrl_vars;
 
 void ctrl_auto(int set_point, int stop_after)
 {
     // log ctrl mode changes
-    if (ctrl_mode != MODE_AUTO)
+    if (ctrl.mode != MODE_AUTO)
     {
         struct date *current_time = get_current_time();
         log_event(current_time->timestamp, mode_change, MODE_AUTO);
     }
-    ctrl_mode = MODE_AUTO;
+    ctrl.mode = MODE_AUTO;
     // log setpoint changes
-    if (auto_ctrl_vars.setpoint != set_point)
+    if (ctrl.setpoint != set_point)
     {
         struct date *current_time = get_current_time();
         log_event(current_time->timestamp, setpoint_change, set_point);
     }
-    auto_ctrl_vars.setpoint = set_point;
-    auto_ctrl_vars.stop_after = stop_after;
-    auto_ctrl_vars.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
-    DEBUG("TEMP CTRL -> AUTO MODE [%d] %s", manual_ctrl_vars.started_on, esp_time.get_timestr(manual_ctrl_vars.started_on));
+    ctrl.setpoint = set_point;
+    ctrl.stop_after = stop_after;
+    ctrl.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
+    DEBUG("TEMP CTRL -> AUTO MODE [%d] %s", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));
     save_cfg();
+}
+
+static void update_setpoint(void);
+
+void ctrl_program(int id)
+{
+    ctrl.program_id = id;
+    delete_program(ctrl.program);
+    ctrl.program = load_program(id);
+    if (ctrl.program == NULL)
+    {
+        // didn't find the program
+        esp_diag.error(TEMP_CTRL_PROGRAM_NOT_FOUND, id);
+        ERROR("ctrl_program cannot find program %d", id);
+        if(ctrl.mode == MODE_PROGRAM)
+            ctrl_off();
+        return;
+    }
+    // a program was found!!
+    // log ctrl mode changes
+    if (ctrl.mode != MODE_PROGRAM)
+    {
+        struct date *current_time = get_current_time();
+        log_event(current_time->timestamp, mode_change, MODE_PROGRAM);
+    }
+    ctrl.mode = MODE_PROGRAM;
+    // dummy set-point
+    ctrl.setpoint = 0;
+    ctrl.stop_after = 0;
+    ctrl.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
+    DEBUG("TEMP CTRL -> PROGRAM MODE [%d] %s", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));
+    save_cfg();
+    update_setpoint();
 }
 
 //
@@ -146,7 +176,7 @@ void ctrl_auto(int set_point, int stop_after)
 
 static struct _adv_ctrl_settings adv_settings;
 
-static void compute_auto_ctrl_vars(void)
+static void compute_ctrl_vars(void)
 {
     // defined as static so that previous value is preserved
     static int e_t = 0;
@@ -158,7 +188,7 @@ static void compute_auto_ctrl_vars(void)
     if (current_temp != INVALID_TEMP)
     {
         // e(t) = set-point - T(t)
-        e_t = auto_ctrl_vars.setpoint - current_temp;
+        e_t = ctrl.setpoint - current_temp;
         // d e(t)/dt
         // on valid temperature reading calculate error derivative
         // otherwise go on with previous values
@@ -178,15 +208,15 @@ static void compute_auto_ctrl_vars(void)
             cur_val = get_temp(idx);
             if (cur_val == INVALID_TEMP)
             {
-                i_e += (auto_ctrl_vars.setpoint - prev_val);
+                i_e += (ctrl.setpoint - prev_val);
                 // DEBUG
-                // fs_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - prev_val));
+                // fs_printf("v:%d e:%d, ", cur_val, (ctrl.setpoint - prev_val));
             }
             else
             {
-                i_e += (auto_ctrl_vars.setpoint - cur_val);
+                i_e += (ctrl.setpoint - cur_val);
                 // DEBUG
-                // fs_printf("v:%d e:%d, ", cur_val, (auto_ctrl_vars.setpoint - cur_val));
+                // fs_printf("v:%d e:%d, ", cur_val, (ctrl.setpoint - cur_val));
                 prev_val = cur_val;
             }
         }
@@ -202,18 +232,18 @@ static void compute_auto_ctrl_vars(void)
         u_t = adv_settings.heater_on_max;
     // calculate the heater on and off periods
     if (u_t > adv_settings.heater_on_min)
-        auto_ctrl_vars.heater_on_period = u_t;
+        ctrl.heater_on_period = u_t;
     else
-        auto_ctrl_vars.heater_on_period = adv_settings.heater_on_min;
-    auto_ctrl_vars.heater_off_period = adv_settings.heater_on_off - auto_ctrl_vars.heater_on_period;
+        ctrl.heater_on_period = adv_settings.heater_on_min;
+    ctrl.heater_off_period = adv_settings.heater_on_off - ctrl.heater_on_period;
     // DEBUG
     // fs_printf(">>> PID:              e(t): %d\n", e_t);
     // fs_printf(">>> PID:         d e(t)/dt: %d\n", de_dt);
     // fs_printf(">>> PID: I(t-60,t) e(x) dx: %d\n", i_e);
     // fs_printf(">>> PID:              u(t): %d\n", (adv_settings.kp * e_t + adv_settings.kd * de_dt + adv_settings.ki * i_e));
     // fs_printf(">>> PID:   normalized u(t): %d\n", u_t);
-    // fs_printf(">>> PID:   heater on timer: %d\n", auto_ctrl_vars.heater_on_period);
-    // fs_printf(">>> PID:  heater off timer: %d\n", auto_ctrl_vars.heater_off_period);
+    // fs_printf(">>> PID:   heater on timer: %d\n", ctrl.heater_on_period);
+    // fs_printf(">>> PID:  heater off timer: %d\n", ctrl.heater_off_period);
 
     // WARM-UP
     // during warm-up the heater-on and heater-off timers are replaced with adv_settings.heater_on_min
@@ -228,9 +258,11 @@ static void compute_auto_ctrl_vars(void)
     if ((current_time->timestamp - warm_up_started_on) < (adv_settings.warm_up_period * 60))
     {
         DEBUG("WARM-UP PHASE");
-        auto_ctrl_vars.heater_on_period = adv_settings.wup_heater_on;
-        auto_ctrl_vars.heater_off_period = adv_settings.wup_heater_off;
+        ctrl.heater_on_period = adv_settings.wup_heater_on;
+        ctrl.heater_off_period = adv_settings.wup_heater_off;
     }
+    DEBUG("CTRL  heater on period -> %d", ctrl.heater_on_period);
+    DEBUG("CTRL heater off period -> %d", ctrl.heater_off_period);
 }
 
 // CRTL settings management
@@ -249,13 +281,6 @@ static bool restore_cfg(void)
     File_to_json cfgfile(CTRL_SETTINGS_FILENAME);
     if (!cfgfile.exists())
         return false;
-    //  {
-    //    ctrl_mode: int,         1 digits
-    //    manual_pulse_on: int,   4 digits
-    //    manual_pulse_off: int,  4 digits
-    //    auto_setpoint: int,     4 digits
-    //    pwr_off_timer: int      4 digits
-    //  }
 
     // ctrl_mode
     if (cfgfile.find_string(f_str("ctrl_mode")))
@@ -264,8 +289,10 @@ static bool restore_cfg(void)
         ERROR("temp_control_restore_cfg cannot find \"ctrl_mode\"");
         return false;
     }
-    ctrl_mode = atoi(cfgfile.get_value());
-    if (ctrl_mode == MODE_MANUAL)
+    ctrl.mode = atoi(cfgfile.get_value());
+    switch (ctrl.mode)
+    {
+    case MODE_MANUAL:
     {
         // manual_pulse_on
         if (cfgfile.find_string(f_str("manual_pulse_on")))
@@ -274,7 +301,7 @@ static bool restore_cfg(void)
             ERROR("temp_control_restore_cfg cannot find \"manual_pulse_on\"");
             return false;
         }
-        manual_ctrl_vars.heater_on_period = atoi(cfgfile.get_value());
+        ctrl.heater_on_period = atoi(cfgfile.get_value());
         // manual_pulse_off
         if (cfgfile.find_string(f_str("manual_pulse_off")))
         {
@@ -282,7 +309,7 @@ static bool restore_cfg(void)
             ERROR("temp_control_restore_cfg cannot find \"manual_pulse_off\"");
             return false;
         }
-        manual_ctrl_vars.heater_off_period = atoi(cfgfile.get_value());
+        ctrl.heater_off_period = atoi(cfgfile.get_value());
         // pwr_off_timer
         if (cfgfile.find_string(f_str("pwr_off_timer")))
         {
@@ -290,9 +317,10 @@ static bool restore_cfg(void)
             ERROR("temp_control_restore_cfg cannot find \"pwr_off_timer\"");
             return false;
         }
-        manual_ctrl_vars.stop_after = atoi(cfgfile.get_value());
+        ctrl.stop_after = atoi(cfgfile.get_value());
     }
-    if (ctrl_mode == MODE_AUTO)
+    break;
+    case MODE_AUTO:
     {
         // auto_setpoint
         if (cfgfile.find_string(f_str("auto_setpoint")))
@@ -301,7 +329,7 @@ static bool restore_cfg(void)
             ERROR("temp_control_restore_cfg cannot find \"auto_setpoint\"");
             return false;
         }
-        auto_ctrl_vars.setpoint = atoi(cfgfile.get_value());
+        ctrl.setpoint = atoi(cfgfile.get_value());
         // pwr_off_timer
         if (cfgfile.find_string(f_str("pwr_off_timer")))
         {
@@ -309,7 +337,24 @@ static bool restore_cfg(void)
             ERROR("temp_control_restore_cfg cannot find \"pwr_off_timer\"");
             return false;
         }
-        auto_ctrl_vars.stop_after = atoi(cfgfile.get_value());
+        ctrl.stop_after = atoi(cfgfile.get_value());
+    }
+    break;
+    case MODE_PROGRAM:
+    {
+        // program_id
+        if (cfgfile.find_string(f_str("program_id")))
+        {
+            esp_diag.error(TEMP_CTRL_RESTORE_CFG_INCOMPLETE);
+            ERROR("temp_control_restore_cfg cannot find \"program_id\"");
+            return false;
+        }
+        ctrl.program_id = atoi(cfgfile.get_value());
+    }
+    break;
+
+    default:
+        break;
     }
     return true;
 }
@@ -326,13 +371,7 @@ static bool saved_cfg_not_updated(void)
     File_to_json cfgfile(CTRL_SETTINGS_FILENAME);
     if (!cfgfile.exists())
         return true;
-    //  {
-    //    ctrl_mode: int,         1 digits
-    //    manual_pulse_on: int,   4 digits
-    //    manual_pulse_off: int,  4 digits
-    //    auto_setpoint: int,     4 digits
-    //    pwr_off_timer: int      4 digits
-    //  }
+
     // ctrl_mode
     if (cfgfile.find_string(f_str("ctrl_mode")))
     {
@@ -340,9 +379,11 @@ static bool saved_cfg_not_updated(void)
         ERROR("temp_control_saved_cfg_not_updated cannot find \"ctrl_mode\"");
         return true;
     }
-    if (ctrl_mode != atoi(cfgfile.get_value()))
+    if (ctrl.mode != atoi(cfgfile.get_value()))
         return true;
-    if (ctrl_mode == MODE_MANUAL)
+    switch (ctrl.mode)
+    {
+    case MODE_MANUAL:
     {
         // manual_pulse_on
         if (cfgfile.find_string(f_str("manual_pulse_on")))
@@ -351,7 +392,7 @@ static bool saved_cfg_not_updated(void)
             ERROR("temp_control_saved_cfg_not_updated cannot find \"manual_pulse_on\"");
             return true;
         }
-        if (manual_ctrl_vars.heater_on_period != atoi(cfgfile.get_value()))
+        if (ctrl.heater_on_period != atoi(cfgfile.get_value()))
             return true;
         // manual_pulse_off
         if (cfgfile.find_string(f_str("manual_pulse_off")))
@@ -360,7 +401,7 @@ static bool saved_cfg_not_updated(void)
             ERROR("temp_control_saved_cfg_not_updated cannot find \"manual_pulse_off\"");
             return true;
         }
-        if (manual_ctrl_vars.heater_off_period != atoi(cfgfile.get_value()))
+        if (ctrl.heater_off_period != atoi(cfgfile.get_value()))
             return true;
         // pwr_off_timer
         if (cfgfile.find_string(f_str("pwr_off_timer")))
@@ -369,10 +410,11 @@ static bool saved_cfg_not_updated(void)
             ERROR("temp_control_saved_cfg_not_updated cannot find \"pwr_off_timer\"");
             return true;
         }
-        if (manual_ctrl_vars.stop_after != atoi(cfgfile.get_value()))
+        if (ctrl.stop_after != atoi(cfgfile.get_value()))
             return true;
     }
-    if (ctrl_mode == MODE_AUTO)
+    break;
+    case MODE_AUTO:
     {
         // auto_setpoint
         if (cfgfile.find_string(f_str("auto_setpoint")))
@@ -381,7 +423,7 @@ static bool saved_cfg_not_updated(void)
             ERROR("temp_control_saved_cfg_not_updated cannot find \"auto_setpoint\"");
             return true;
         }
-        if (manual_ctrl_vars.heater_on_period != atoi(cfgfile.get_value()))
+        if (ctrl.heater_on_period != atoi(cfgfile.get_value()))
             return true;
         // pwr_off_timer
         if (cfgfile.find_string(f_str("pwr_off_timer")))
@@ -390,8 +432,25 @@ static bool saved_cfg_not_updated(void)
             ERROR("temp_control_saved_cfg_not_updated cannot find \"pwr_off_timer\"");
             return true;
         }
-        if (auto_ctrl_vars.stop_after != atoi(cfgfile.get_value()))
+        if (ctrl.stop_after != atoi(cfgfile.get_value()))
             return true;
+    }
+    break;
+    case MODE_PROGRAM:
+    {
+        // program_id
+        if (cfgfile.find_string(f_str("program_id")))
+        {
+            esp_diag.error(TEMP_CTRL_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("temp_control_saved_cfg_not_updated cannot find \"program_id\"");
+            return true;
+        }
+        if (ctrl.program_id != atoi(cfgfile.get_value()))
+            return true;
+    }
+    break;
+    default:
+        break;
     }
     return false;
 }
@@ -432,49 +491,61 @@ static void save_cfg(void)
         ERROR("temp_control_save_cfg cannot open %s", CTRL_SETTINGS_FILENAME);
         return;
     }
-    //  {
-    //    ctrl_mode: int,         1 digits
-    //    manual_pulse_on: int,   4 digits
-    //    manual_pulse_off: int,  4 digits
-    //    auto_setpoint: int,     4 digits
-    //    pwr_off_timer: int      4 digits
-    //  }
 
-    if (ctrl_mode == MODE_OFF)
+    switch (ctrl.mode)
+    {
+    case MODE_OFF:
     {
         //  {"ctrl_mode": }
         char buffer[(15 + 1 + 1)];
         fs_sprintf(buffer,
                    "{\"ctrl_mode\": %d}",
-                   ctrl_mode);
+                   ctrl.mode);
         cfgfile.n_append(buffer, os_strlen(buffer));
     }
-    if (ctrl_mode == MODE_MANUAL)
+    break;
+    case MODE_MANUAL:
     {
         //  {"ctrl_mode": ,"manual_pulse_on": ,"manual_pulse_off": ,"pwr_off_timer": }
         char buffer[(74 + 1 + 5 + 5 + 5 + 1)];
         fs_sprintf(buffer,
                    "{\"ctrl_mode\": %d,"
                    "\"manual_pulse_on\": %d,",
-                   ctrl_mode,
-                   manual_ctrl_vars.heater_on_period);
+                   ctrl.mode,
+                   ctrl.heater_on_period);
         fs_sprintf(buffer + os_strlen(buffer),
                    "\"manual_pulse_off\": %d,"
                    "\"pwr_off_timer\": %d}",
-                   manual_ctrl_vars.heater_off_period,
-                   manual_ctrl_vars.stop_after);
+                   ctrl.heater_off_period,
+                   ctrl.stop_after);
         cfgfile.n_append(buffer, os_strlen(buffer));
     }
-    if (ctrl_mode == MODE_AUTO)
+    break;
+    case MODE_AUTO:
     {
         //  {"ctrl_mode": ,"auto_setpoint": ,"pwr_off_timer": }
         char buffer[(51 + 1 + 5 + 5 + 1)];
         fs_sprintf(buffer,
                    "{\"ctrl_mode\": %d,\"auto_setpoint\": %d,\"pwr_off_timer\": %d}",
-                   ctrl_mode,
-                   auto_ctrl_vars.setpoint,
-                   auto_ctrl_vars.stop_after);
+                   ctrl.mode,
+                   ctrl.setpoint,
+                   ctrl.stop_after);
         cfgfile.n_append(buffer, os_strlen(buffer));
+    }
+    break;
+    case MODE_PROGRAM:
+    {
+        //  {"ctrl_mode": "program_id": }
+        char buffer[(29 + 1 + 1 + 5)];
+        fs_sprintf(buffer,
+                   "{\"ctrl_mode\": %d,\"program_id\": %d}",
+                   ctrl.mode,
+                   ctrl.program_id);
+        cfgfile.n_append(buffer, os_strlen(buffer));
+    }
+    break;
+    default:
+        break;
     }
 }
 
@@ -837,18 +908,23 @@ void temp_control_init(void)
     heater_vars.last_heater_on = 0;
     heater_vars.last_heater_off = 0;
 
+    init_program_list();
+
     if (restore_cfg())
     {
-        switch (ctrl_mode)
+        switch (ctrl.mode)
         {
         case MODE_OFF:
             ctrl_off();
             break;
         case MODE_MANUAL:
-            ctrl_manual(manual_ctrl_vars.heater_on_period, manual_ctrl_vars.heater_off_period, manual_ctrl_vars.stop_after);
+            ctrl_manual(ctrl.heater_on_period, ctrl.heater_off_period, ctrl.stop_after);
             break;
         case MODE_AUTO:
-            ctrl_auto(auto_ctrl_vars.setpoint, auto_ctrl_vars.stop_after);
+            ctrl_auto(ctrl.setpoint, ctrl.stop_after);
+            break;
+        case MODE_PROGRAM:
+            ctrl_program(ctrl.program_id);
             break;
         default:
             break;
@@ -885,23 +961,23 @@ void temp_control_init(void)
     }
 }
 
-void temp_control_manual(void)
+static void run_control_manual(void)
 {
-    ALL("temp_control_manual");
+    ALL("run_control_manual");
     struct date *current_time = get_current_time();
 
     // switch off timer management (if enabled)
-    if (manual_ctrl_vars.stop_after > 0)
+    if (ctrl.stop_after > 0)
     {
-        uint32 running_since = current_time->timestamp - manual_ctrl_vars.started_on;
-        if (running_since >= (manual_ctrl_vars.stop_after * 60))
+        uint32 running_since = current_time->timestamp - ctrl.started_on;
+        if (running_since >= (ctrl.stop_after * 60))
         {
             ctrl_off();
             return;
         }
     }
     // running continuosly
-    if (manual_ctrl_vars.heater_on_period == 0)
+    if (ctrl.heater_on_period == 0)
     {
         if (!is_heater_on())
             switch_on_heater();
@@ -910,44 +986,44 @@ void temp_control_manual(void)
     // heater on duty cycle
     if (is_heater_on())
     {
-        if ((current_time->timestamp - heater_vars.last_heater_on) >= (manual_ctrl_vars.heater_on_period * 60))
+        if ((current_time->timestamp - heater_vars.last_heater_on) >= (ctrl.heater_on_period * 60))
             switch_off_heater();
     }
     else
     {
-        if ((current_time->timestamp - heater_vars.last_heater_off) >= (manual_ctrl_vars.heater_off_period * 60))
+        if ((current_time->timestamp - heater_vars.last_heater_off) >= (ctrl.heater_off_period * 60))
             switch_on_heater();
     }
 }
 
-void temp_control_auto(void)
+static void run_control_auto(void)
 {
-    ALL("temp_control_auto");
+    ALL("run_control_auto");
     struct date *current_time = get_current_time();
     // switch off timer management (if enabled)
-    if (auto_ctrl_vars.stop_after > 0)
+    if (ctrl.stop_after > 0)
     {
-        uint32 running_since = current_time->timestamp - auto_ctrl_vars.started_on;
-        if (running_since >= (auto_ctrl_vars.stop_after * 60))
+        uint32 running_since = current_time->timestamp - ctrl.started_on;
+        if (running_since >= (ctrl.stop_after * 60))
         {
             ctrl_off();
             return;
         }
     }
     // update ctrl vars
-    compute_auto_ctrl_vars();
+    compute_ctrl_vars();
     // check if it's time to switch the heater off
     if (is_heater_on())
     {
         // temperature reached the setpoint
-        if (get_temp(0) >= auto_ctrl_vars.setpoint)
+        if (get_temp(0) >= ctrl.setpoint)
         {
             switch_off_heater();
             return;
         }
         // the heater on period has completed
         uint32 heater_on_since = current_time->timestamp - heater_vars.last_heater_on;
-        if (heater_on_since >= (auto_ctrl_vars.heater_on_period * 60))
+        if (heater_on_since >= (ctrl.heater_on_period * 60))
         {
             switch_off_heater();
             return;
@@ -958,14 +1034,107 @@ void temp_control_auto(void)
         // here the heater is off
 
         // temperature reached the setpoint
-        if (get_temp(0) >= auto_ctrl_vars.setpoint)
+        if (get_temp(0) >= ctrl.setpoint)
         {
             // do nothing
             return;
         }
         // when the heater off period exhausted then turn on the heater
         uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
-        if (heater_off_since >= (auto_ctrl_vars.heater_off_period * 60))
+        if (heater_off_since >= (ctrl.heater_off_period * 60))
+        {
+            switch_on_heater();
+            return;
+        }
+    }
+}
+
+static void update_setpoint(void)
+{
+    ALL("update_setpoint");
+    struct date *current_time = get_current_time();
+    // find the current program
+    if(ctrl.program == NULL)
+    {
+        esp_diag.error(TEMP_CTRL_UPDATE_SETPOINT_NO_PROGRAM_AVAILABLE);
+        ERROR("update_setpoint no program available");
+        return;
+    }
+    // set the default temperature setpoint
+    int set_point = ctrl.program->min_temp;
+    // program
+    // find the set_point for day_of_week, hours, minutes
+    // struct date
+    // {
+    //     int year;
+    //     char month;
+    //     char day_of_month;
+    //     char hours;
+    //     char minutes;
+    //     char seconds;
+    //     char day_of_week;
+    //     uint32 timestamp;
+    // };
+    int idx;
+    int current_minutes = (current_time->hours * 60) + current_time->minutes;
+    for (idx = 0; idx < ctrl.program->period_count; idx++)
+    {
+        if ((ctrl.program->period[idx].day_of_week == everyday) || (ctrl.program->period[idx].day_of_week == current_time->day_of_week))
+        {
+            if ((ctrl.program->period[idx].mm_start <= current_minutes) && (current_minutes < ctrl.program->period[idx].mm_end))
+            {
+                set_point = ctrl.program->period[idx].setpoint;
+                break;
+            }
+        }
+    }
+
+    // and log setpoint changes
+    if (ctrl.setpoint != set_point)
+    {
+        log_event(current_time->timestamp, setpoint_change, set_point);
+        DEBUG("CTRL set point changed to %d", set_point);
+    }
+    ctrl.setpoint = set_point;
+}
+
+static void run_control_program(void)
+{
+    ALL("run_control_program");
+    struct date *current_time = get_current_time();
+    update_setpoint();
+    // update ctrl vars
+    compute_ctrl_vars();
+    // check if it's time to switch the heater off
+    if (is_heater_on())
+    {
+        // temperature reached the setpoint
+        if (get_temp(0) >= ctrl.setpoint)
+        {
+            switch_off_heater();
+            return;
+        }
+        // the heater on period has completed
+        uint32 heater_on_since = current_time->timestamp - heater_vars.last_heater_on;
+        if (heater_on_since >= (ctrl.heater_on_period * 60))
+        {
+            switch_off_heater();
+            return;
+        }
+    }
+    else
+    {
+        // here the heater is off
+
+        // temperature reached the setpoint
+        if (get_temp(0) >= ctrl.setpoint)
+        {
+            // do nothing
+            return;
+        }
+        // when the heater off period exhausted then turn on the heater
+        uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
+        if (heater_off_since >= (ctrl.heater_off_period * 60))
         {
             switch_on_heater();
             return;
@@ -976,20 +1145,24 @@ void temp_control_auto(void)
 void temp_control_run(void)
 {
     DEBUG("CTRL STATUS at [%d] %s", get_current_time()->timestamp, esp_time.get_timestr(get_current_time()->timestamp));
-    switch (ctrl_mode)
+    switch (ctrl.mode)
     {
     case MODE_OFF:
-        DEBUG("   CTRL MODE OFF");
+        DEBUG("CTRL MODE OFF");
         if (is_heater_on())
             switch_off_heater();
         break;
     case MODE_MANUAL:
-        DEBUG("   CTRL MODE MANUAL (since [%d] %s)", manual_ctrl_vars.started_on, esp_time.get_timestr(manual_ctrl_vars.started_on));
-        temp_control_manual();
+        DEBUG("CTRL MODE MANUAL (since [%d] %s)", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));
+        run_control_manual();
         break;
     case MODE_AUTO:
-        DEBUG("   CTRL MODE AUTO (since [%d] %s)", auto_ctrl_vars.started_on, esp_time.get_timestr(auto_ctrl_vars.started_on));
-        temp_control_auto();
+        DEBUG("CTRL MODE AUTO (since [%d] %s)", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));
+        run_control_auto();
+        break;
+    case MODE_PROGRAM:
+        DEBUG("CTRL MODE PROGRAM (since [%d] %s)", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));
+        run_control_program();
         break;
     default:
         break;
@@ -1002,36 +1175,35 @@ void temp_control_run(void)
 
 int get_current_mode(void)
 {
-    return ctrl_mode;
+    return ctrl.mode;
 }
 
 int get_pwr_off_timer(void)
 {
-    if (ctrl_mode == MODE_MANUAL)
-        return manual_ctrl_vars.stop_after;
-    if (ctrl_mode == MODE_AUTO)
-        return auto_ctrl_vars.stop_after;
+    return ctrl.stop_after;
 }
 
 uint32 get_pwr_off_timer_started_on(void)
 {
-    if (ctrl_mode == MODE_MANUAL)
-        return manual_ctrl_vars.started_on;
-    if (ctrl_mode == MODE_AUTO)
-        return auto_ctrl_vars.started_on;
+    return ctrl.started_on;
 }
 
 int get_auto_setpoint(void)
 {
-    return auto_ctrl_vars.setpoint;
+    return ctrl.setpoint;
 }
 
 int get_manual_pulse_on(void)
 {
-    return manual_ctrl_vars.heater_on_period;
+    return ctrl.heater_on_period;
 }
 
 int get_manual_pulse_off(void)
 {
-    return manual_ctrl_vars.heater_off_period;
+    return ctrl.heater_off_period;
+}
+
+int get_program_id(void)
+{
+    return ctrl.program_id;
 }

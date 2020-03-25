@@ -1,8 +1,8 @@
 const esp8266 = {
-  // "url": "http://192.168.1.105",
+  "url": "http://192.168.1.105",
   // "url": "http://192.168.1.185",
   // "cors": true
-  "url": "",
+  // "url": "",
   "cors": false
 };
 
@@ -178,14 +178,17 @@ function update_current_vars(data) {
       return "heater ON";
   });
   $("#thermo_temp_target").text(function () {
-    if (data.ctrl_mode == 2)
+    if ((data.ctrl_mode == 2) || (data.ctrl_mode == 3))
       return "setpoint " + (data.auto_setpoint / 10).toFixed(1);
     else
       return "no setpoint";
   });
-  let mode = new Array("OFF", "MANUAL", "AUTO");
+  let mode = new Array("OFF", "MANUAL", "AUTO", "PROGRAM");
   $("#thermo_mode").text(function () {
-    return "mode " + mode[data.ctrl_mode];
+    if (data.ctrl_mode <= 2)
+      return "mode " + mode[data.ctrl_mode];
+    else
+      return mode[data.ctrl_mode] + " " + data.program_name;
   });
   if (data.pwr_off_timer == 0) {
     $("#thermo_pwr_off").addClass('d-none');
@@ -307,6 +310,13 @@ function refresh_settings_view() {
       $("#off_timer").attr('readonly', true);
     else
       $("#off_timer").attr('readonly', false);
+  }
+  if ($('#ctrl_mode').val() == 3) {
+    $("#manual_settings").addClass('d-none');
+    $("#manual_pulse_on").addClass('d-none');
+    $("#manual_pulse_off").addClass('d-none');
+    $("#auto_setpoint").addClass('d-none');
+    $("#power_off_timer").addClass('d-none');
   }
 }
 
