@@ -20,15 +20,17 @@ enum week_days{
     everyday = 8
 };
 
-// DEBUG is this required ?
 struct prgm_headings
 {
     int id;
     char desc[33];    
 };
 
-// DEBUG is this required ?
-// extern List<struct prgm_headings> *program_lst;
+#define MAX_PROGRAM_COUNT 10
+
+extern List<struct prgm_headings> *program_lst;
+
+void init_program_list(void);
 
 struct prgm_period
 {
@@ -48,7 +50,12 @@ struct prgm
 
 extern struct prgm *current_program;
 
-void init_program_list(void);
+#define MAX_PRG_COUNT_REACHED (-1)
+#define ERR_SAVING_PRG (-2)
+#define ERR_MEM_EXHAUSTED (-3)
+
+int add_program(char *, struct prgm *); // return id or <0 if fails
+int del_program(int);                   // return id or <0 if fails
 
 void delete_program(struct prgm *);
 struct prgm *load_program(int idx);

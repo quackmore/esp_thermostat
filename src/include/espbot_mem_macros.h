@@ -24,6 +24,13 @@
     os_sprintf_plus(buf, flash_str, ##__VA_ARGS__);          \
   } while (0)
 
+#define fs_snprintf(buf, n, fmt, ...)                        \
+  do                                                         \
+  {                                                          \
+    static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt; \
+    os_snprintf_plus(buf, n, flash_str, ##__VA_ARGS__);      \
+  } while (0)
+
 #define fs_printf(fmt, ...)                                  \
   do                                                         \
   {                                                          \

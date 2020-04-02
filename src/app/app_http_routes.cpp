@@ -748,7 +748,7 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved!"), false);
 }
 
-void run_test(int test_number)
+void run_test(int test_number, int test_param)
 {
     // void set_remote_log(bool enabled, char* host, int port, char* path);
     // bool get_remote_log_enabled(void);
@@ -758,6 +758,7 @@ void run_test(int test_number)
 
     switch (test_number)
     {
+    /*
     case 10:
         fs_printf("---> remote log cfg\n");
         fs_printf("---> enabled: %d\n", get_remote_log_enabled());
@@ -839,10 +840,197 @@ void run_test(int test_number)
         set_adv_ctrl_settings(&adv_settings);
     }
     break;
+    */
+    case 1:
+    {
+        // print program list
+        int idx = 1;
+        struct prgm_headings *ptr = program_lst->front();
+        fs_printf("---> PROGRAM_LIST\n");
+        while (ptr)
+        {
+            fs_printf("%d - ID: %d - %s\n", idx, ptr->id, ptr->desc);
+            idx++;
+            ptr = program_lst->next();
+        }
+        fs_printf("---> END PROGRAM_LIST\n");
+    }
+    break;
+    case 2:
+    {
+        // load program
+        struct prgm *ptr = load_program(test_param);
+        if (ptr)
+        {
+            fs_printf("--->      PROGRAM %d\n", test_param);
+            fs_printf("--->     min_temp %d\n", ptr->min_temp);
+            fs_printf("---> period_count %d\n", ptr->period_count);
+            int idx;
+            for (idx = 0; idx < ptr->period_count; idx++)
+            {
+                fs_printf("---> period %d - day of week %d - start %d - end %d - setpoint %d\n",
+                          idx,
+                          ptr->period[idx].day_of_week,
+                          ptr->period[idx].mm_start,
+                          ptr->period[idx].mm_end,
+                          ptr->period[idx].setpoint);
+            }
+            fs_printf("---> END PROGRAM\n");
+        }
+        else
+        {
+            fs_printf("---> No program with id %d\n", test_param);
+        }
+    }
+    break;
+    case 3:
+    {
+        // delete program_lst
+        fs_printf("deleting program list\n");
+        int idx;
+        int up_to = program_lst->size();
+        for (idx = 0; idx < up_to; idx++)
+        {
+            program_lst->front();
+            program_lst->remove();
+        }
+        fs_printf("deleting program files\n");
+        for (idx = 0; idx < MAX_PROGRAM_COUNT; idx++)
+        {
+            char filename[33];
+            fs_snprintf(filename, 32, "program_%d.prg", idx);
+            if (Ffile::exists(&espfs, filename))
+            {
+                Ffile cfgfile(&espfs, filename);
+                fs_printf("deleting %s\n", filename);
+                cfgfile.remove();
+            }
+        }
+        fs_printf("deleting completed.\n");
+    }
+    break;
+    case 4:
+    {
+        // add a program
+        // PROGRAM
+        // {
+        //     "id": 1,
+        //     "min_temp": 100,
+        //     "period_count": 3,
+        //     "periods": [
+        //         {"wd": 8,"b":1880,"e":1880,"sp":200},
+        //         {"wd": 8,"b":1880,"e":1880,"sp":200},
+        //         {"wd": 8,"b":1880,"e":1880,"sp":200}
+        //     ]
+        // }
+        static int prg_counter = 0;
+        prg_counter++;
+        char prg_name[33];
+        fs_snprintf(prg_name, 32, "program %d", prg_counter);
+        struct prgm new_prg;
+        new_prg.min_temp = 100;
+        new_prg.period_count = (2 * prg_counter);
+        struct prgm_period periods[new_prg.period_count];
+        new_prg.period = periods;
+        int idx;
+        for (idx = 0; idx < new_prg.period_count; idx++)
+        {
+            new_prg.period[idx].day_of_week = everyday;
+            new_prg.period[idx].mm_start = (idx + 1) * 100;
+            new_prg.period[idx].mm_end = (idx + 1) * 200;
+            new_prg.period[idx].setpoint = 200;
+        }
+        fs_printf("adding program %s\n", prg_name);
+        int result = add_program(prg_name, &new_prg);
+        fs_printf("done. Result is %d.\n", result);
+        esp_stack_mon();
+    }
+    break;
+    case 5:
+    {
+        // remove program
+        fs_printf("deleting program %d\n", test_param);
+        int result = del_program(test_param);
+        fs_printf("done. Result is %d.\n", result);
+    }
+    break;
 
     default:
         break;
     }
+}
+
+static void post_api_test(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_test");
+    //  {
+    //    test: int
+    //  }
+    Json_str settings(parsed_req->req_content, parsed_req->content_len);
+    if (settings.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    //    test: int,         1 digits
+    int test_number;
+    if (settings.find_pair(f_str("test")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test' does not have an INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk str_test(settings.get_cur_pair_value_len());
+    if (str_test.ref == NULL)
+    {
+        ERROR("post_api_test heap exhausted %d", settings.get_cur_pair_value_len());
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    os_strncpy(str_test.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    test_number = atoi(str_test.ref);
+
+    //    param: int,         1 digits
+    int test_param;
+    if (settings.find_pair(f_str("param")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'param'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'param' does not have an INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk str_param(settings.get_cur_pair_value_len());
+    if (str_param.ref == NULL)
+    {
+        ERROR("post_api_test heap exhausted %d", settings.get_cur_pair_value_len());
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    os_strncpy(str_param.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    test_param = atoi(str_param.ref);
+
+    // {"test": ,"param": }
+    int msg_len = 20 + 6 + 6 + 1;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        ERROR("post_api_test heap exhausted %d", msg_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+
+    run_test(test_number, test_param);
+
+    fs_sprintf(msg.ref, "{\"test\": %d,\"param\": %d}", test_number, test_param);
+
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
 bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -887,6 +1075,11 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/remote_log_settings"))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_remote_log_settings(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/test"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_test(ptr_espconn, parsed_req);
         return true;
     }
     return false;

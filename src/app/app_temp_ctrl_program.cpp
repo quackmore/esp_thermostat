@@ -67,7 +67,6 @@ static bool restore_prgm_list(void)
         return false;
     }
 
-    program_lst = new List<struct prgm_headings>(prg_count, delete_content);
     int idx;
     for (idx = 0; idx < prg_count; idx++)
     {
@@ -250,6 +249,7 @@ static void save_prgm_list(void)
                    "{\"prgm_count\": %d,\"headings\": [",
                    program_lst->size());
         cfgfile.n_append(buffer, os_strlen(buffer));
+        espmem.stack_mon();
     }
     int idx;
     bool first_time = true;
@@ -259,24 +259,29 @@ static void save_prgm_list(void)
         //  ,{"id": ,"desc":""}
         char buffer[(19 + 1 + 2 + 32)];
         if (first_time)
+        {
+            first_time = false;
             fs_sprintf(buffer,
-                       "{\"id\": %d,\"desc\":\"%s\"",
+                       "{\"id\": %d,\"desc\":\"%s\"}",
                        cur_heading->id,
                        cur_heading->desc);
+        }
         else
             fs_sprintf(buffer,
-                       ",{\"id\": %d,\"desc\":\"%s\"",
+                       ",{\"id\": %d,\"desc\":\"%s\"}",
                        cur_heading->id,
                        cur_heading->desc);
 
         cfgfile.n_append(buffer, os_strlen(buffer));
         cur_heading = program_lst->next();
+        espmem.stack_mon();
     }
     {
         //  ]}
         char buffer[(2 + 1)];
         fs_sprintf(buffer, "]}");
         cfgfile.n_append(buffer, os_strlen(buffer));
+        espmem.stack_mon();
     }
 }
 
@@ -294,13 +299,13 @@ void init_program_list(void)
 {
     ALL("init_program_list");
 
-    program_lst = NULL;
+    program_lst = new List<struct prgm_headings>(MAX_PROGRAM_COUNT, delete_content);
 
     if (!restore_prgm_list())
     {
         // CTRL DEFAULT
         esp_diag.warn(TEMP_CTRL_INIT_DEFAULT_PRGM_LIST);
-        WARN("init_program_list no ctrl cfg available");
+        WARN("init_program_list no program available");
     }
 }
 
@@ -325,7 +330,7 @@ void delete_program(struct prgm *prog_ptr)
 //     ]
 // }
 
-struct prgm *load_program(int idx)
+struct prgm *load_program(int prg_id)
 {
     if (program_lst == NULL)
     {
@@ -333,12 +338,12 @@ struct prgm *load_program(int idx)
         ERROR("load_program no program list");
         return NULL;
     }
-    // search for program name
+    // search for program id
     bool program_not_found = true;
     struct prgm_headings *cur_heading = program_lst->front();
     while (cur_heading)
     {
-        if (cur_heading->id == idx)
+        if (cur_heading->id == prg_id)
         {
             program_not_found = false;
             break;
@@ -348,25 +353,28 @@ struct prgm *load_program(int idx)
     // check if a program was found
     if (program_not_found)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_NO_PROGRAM_ID, idx);
-        ERROR("load_program no program id %d", idx);
+        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_NO_PROGRAM_ID, prg_id);
+        ERROR("load_program no program id %d", prg_id);
         return NULL;
     }
     char filename[33];
     os_memset(filename, 0, 33);
-    os_strncpy(filename, cur_heading->desc, 32);
-    // replace all chars different by letters or numbers with '_'
-    int count;
-    for (count = 0; count < 33; count++)
-    {
-        if (('0' <= filename[count]) && (filename[count] <= '9') ||
-            ('A' <= filename[count]) && (filename[count] <= 'Z') ||
-            ('a' <= filename[count]) && (filename[count] <= 'z') ||
-            (filename[count] == 0))
-            continue;
-        else
-            filename[count] = '_';
-    }
+    fs_snprintf(filename, 32, "program_%d.prg", prg_id);
+
+    // os_strncpy(filename, cur_heading->desc, 32);
+    // // replace all chars different by letters or numbers with '_'
+    // int count;
+    // for (count = 0; count < 33; count++)
+    // {
+    //     if (('0' <= filename[count]) && (filename[count] <= '9') ||
+    //         ('A' <= filename[count]) && (filename[count] <= 'Z') ||
+    //         ('a' <= filename[count]) && (filename[count] <= 'z') ||
+    //         (filename[count] == 0))
+    //         continue;
+    //     else
+    //         filename[count] = '_';
+    // }
+
     TRACE("load_program filename %s", filename);
     // now look for file
     if (!espfs.is_available())
@@ -390,7 +398,7 @@ struct prgm *load_program(int idx)
         return NULL;
     }
     int tmp_id = atoi(cfgfile.get_value());
-    if (idx != tmp_id)
+    if (prg_id != tmp_id)
     {
         esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
         ERROR("load_program wrong id \"id\"", atoi(cfgfile.get_value()));
@@ -430,14 +438,14 @@ struct prgm *load_program(int idx)
         return NULL;
     }
 
-    struct prgm *new_prg = new struct prgm[tmp_period_count];
+    struct prgm *new_prg = new struct prgm;
     if (new_prg == NULL)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_HEAP_EXHAUSTED, sizeof(struct prgm[tmp_period_count]));
-        ERROR("load_program heap exhausted %d", sizeof(struct prgm[tmp_period_count]));
+        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_HEAP_EXHAUSTED, sizeof(struct prgm));
+        ERROR("load_program heap exhausted %d", sizeof(struct prgm));
         return NULL;
     }
-    new_prg->id = idx;
+    new_prg->id = prg_id;
     new_prg->min_temp = tmp_min_temp;
     new_prg->period_count = tmp_period_count;
     new_prg->period = new struct prgm_period[tmp_period_count];
@@ -447,7 +455,7 @@ struct prgm *load_program(int idx)
         ERROR("load_program heap exhausted %d", sizeof(struct prgm_period[tmp_period_count]));
         return NULL;
     }
-
+    int count;
     for (count = 0; count < program_lst->size(); count++)
     {
         if ((tmp_periods.get_elem(count) == NULL) || (tmp_periods.get_elem_type(count) != JSON_OBJECT))
@@ -519,6 +527,7 @@ struct prgm *load_program(int idx)
         }
         new_prg->period[count].setpoint = (week_days)atoi(period.get_cur_pair_value());
     }
+    espmem.stack_mon();
     return new_prg;
 }
 
@@ -535,4 +544,184 @@ char *get_cur_program_name(int id)
         return tmp_ptr->desc;
     else
         return (char *)f_str("none");
+}
+
+static bool save_program(struct prgm *prg)
+{
+    char filename[33];
+    os_memset(filename, 0, 33);
+    fs_snprintf(filename, 32, "program_%d.prg", prg->id);
+
+    TRACE("save_program filename %s", filename);
+    // now look for file
+    if (!espfs.is_available())
+    {
+        esp_diag.error(TEMP_CTRL_SAVE_PRGM_FS_NOT_AVAILABLE);
+        ERROR("save_program FS not available");
+        return false;
+    }
+    if (Ffile::exists(&espfs, filename))
+    {
+        Ffile cfgfile(&espfs, filename);
+        cfgfile.remove();
+    }
+    Ffile cfgfile(&espfs, filename);
+    if (!cfgfile.is_available())
+    {
+        esp_diag.error(TEMP_CTRL_SAVE_PRGM_CANNOT_OPEN_FILE);
+        ERROR("save_program cannot open %s", filename);
+        return false;
+    }
+
+    // PROGRAM
+    // {
+    //     "id": 1,
+    //     "min_temp": 100,
+    //     "period_count": 3,
+    //     "periods": [
+    //         {"wd": 8,"b":1880,"e":1880,"sp":200},
+    //         {"wd": 8,"b":1880,"e":1880,"sp":200},
+    //         {"wd": 8,"b":1880,"e":1880,"sp":200}
+    //     ]
+    // }
+    {
+        //  {"id": ,"min_temp": ,"period_count": ,"period": [
+        char buffer[(50 + 1 + 2 + 5 + 5)];
+        fs_sprintf(buffer,
+                   "{\"id\": %d,\"min_temp\": %d,\"period_count\": %d,\"period\": [",
+                   prg->id,
+                   prg->min_temp,
+                   prg->period_count);
+        cfgfile.n_append(buffer, os_strlen(buffer));
+        espmem.stack_mon();
+    }
+    int idx;
+    bool first_time = true;
+    for (idx = 0; idx < prg->period_count; idx++)
+    {
+        //  ,{"wd":,"b":,"e":,"sp":}
+        char buffer[(24 + 1 + 1 + 4 + 4 + 5)];
+        if (first_time)
+        {
+            first_time = false;
+            fs_sprintf(buffer,
+                       "{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
+                       prg->period[idx].day_of_week,
+                       prg->period[idx].mm_start,
+                       prg->period[idx].mm_end,
+                       prg->period[idx].setpoint);
+        }
+        else
+            fs_sprintf(buffer,
+                       ",{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
+                       prg->period[idx].day_of_week,
+                       prg->period[idx].mm_start,
+                       prg->period[idx].mm_end,
+                       prg->period[idx].setpoint);
+
+        cfgfile.n_append(buffer, os_strlen(buffer));
+        espmem.stack_mon();
+    }
+    {
+        //  ]}
+        char buffer[(2 + 1)];
+        fs_sprintf(buffer, "]}");
+        cfgfile.n_append(buffer, os_strlen(buffer));
+        espmem.stack_mon();
+    }
+    return true;
+}
+
+int add_program(char *name, struct prgm *prg)
+{
+    // check if the max number of programs was reached
+    if (program_lst->size() >= MAX_PROGRAM_COUNT)
+        return MAX_PRG_COUNT_REACHED;
+    // find a free id [0..(MAX_PROGRAM_COUNT-1)]
+    int idx;
+    for (idx = 0; idx < MAX_PROGRAM_COUNT; idx++)
+    {
+        struct prgm_headings *prgm_ptr = program_lst->front();
+        bool free_id_found = true;
+        while (prgm_ptr)
+        {
+            if (prgm_ptr->id == idx)
+            {
+                free_id_found = false;
+                break;
+            }
+            prgm_ptr = program_lst->next();
+        }
+        if (free_id_found)
+            break;
+    }
+    int prg_id = idx;
+    // override program id
+    prg->id = prg_id;
+    // write program file
+    if (!save_program(prg))
+        return ERR_SAVING_PRG;
+    // add program heading
+    struct prgm_headings *heading_ptr = new struct prgm_headings;
+    if (heading_ptr == NULL)
+    {
+        esp_diag.error(TEMP_CTRL_ADD_PRGM_HEAP_EXHAUSTED, sizeof(struct prgm_headings));
+        ERROR("add_program heap memory exhausted %d", sizeof(struct prgm_headings));
+        return ERR_MEM_EXHAUSTED;
+    }
+    heading_ptr->id = prg_id;
+    os_strncpy(heading_ptr->desc, name, 32);
+    program_lst->push_back(heading_ptr);
+    if (saved_prgm_list_not_updated())
+        save_prgm_list();
+    espmem.stack_mon();
+    // return id
+    return prg_id;
+}
+
+int del_program(int prg_id)
+{
+    // delete the file
+    char filename[33];
+    os_memset(filename, 0, 33);
+    fs_snprintf(filename, 32, "program_%d.prg", prg_id);
+    TRACE("del_program filename %s", filename);
+    if (espfs.is_available())
+    {
+        if (Ffile::exists(&espfs, filename))
+        {
+            Ffile cfgfile(&espfs, filename);
+            cfgfile.remove();
+        }
+    }
+    else
+    {
+        esp_diag.error(TEMP_CTRL_DEL_PRGM_FS_NOT_AVAILABLE);
+        ERROR("del_program FS not available");
+    }
+    // find the program id into the headings list
+    struct prgm_headings *heading_ptr = program_lst->front();
+    bool heading_found = false;
+    while (heading_ptr)
+    {
+        if (heading_ptr->id == prg_id)
+        {
+            heading_found = true;
+            break;
+        }
+        heading_ptr = program_lst->next();
+    }
+    espmem.stack_mon();
+    if (heading_found)
+    {
+        // return the program_id
+        program_lst->remove();
+    if (saved_prgm_list_not_updated())
+        save_prgm_list();
+        return prg_id;
+    }
+    else
+    {
+        return -1;
+    }
 }
