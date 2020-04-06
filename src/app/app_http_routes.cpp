@@ -92,7 +92,7 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
     {
         esp_diag.error(APP_GET_API_TEMP_CTRL_VARS_HEAP_EXHAUSTED, str_len);
         ERROR("get_api_temp_ctrl_vars heap exhausted %d", str_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted!"), false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
     struct date *current_time = get_current_time();
@@ -122,20 +122,24 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
 static void get_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("get_api_temp_ctrl_settings");
+    //  {"ctrl_mode": ,"manual_pulse_on": ,"manual_pulse_off": ,"auto_setpoint": ,"program_id": ,"program_name": "","pwr_off_timer": }
+
     //  {
     //    ctrl_mode: int,         1 digits
     //    manual_pulse_on: int,   4 digits
     //    manual_pulse_off: int,  4 digits
     //    auto_setpoint: int,     4 digits
+    //    program_id: int,        2 digits
+    //    program_name: int,     32 digits
     //    pwr_off_timer: int      4 digits
     //  }
-    int str_len = 98 + 1 + 4 + 4 + 4 + 4 + 1;
+    int str_len = 126 + 1 + 4 + 4 + 4 + 2 + 32 + 4 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
         esp_diag.error(APP_GET_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, str_len);
         ERROR("get_api_temp_ctrl_settings heap exhausted %d", str_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted!"), false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
     fs_sprintf(msg.ref,
@@ -147,8 +151,13 @@ static void get_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed_
                get_manual_pulse_off());
     fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"auto_setpoint\":%d,"
-               "\"pwr_off_timer\":%d}",
+               "\"program_id\":%d,",
                get_auto_setpoint(),
+               get_program_id());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"program_name\":\"%s\","
+               "\"pwr_off_timer\":%d}",
+               get_cur_program_name(get_program_id()),
                get_pwr_off_timer());
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
@@ -161,6 +170,7 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     //    manual_pulse_on: int,   4 digits
     //    manual_pulse_off: int,  4 digits
     //    auto_setpoint: int,     4 digits
+    //    program_id: int,        2 digits
     //    powrr_off_timer: int    4 digits
     //  }
     //
@@ -262,6 +272,29 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     os_strncpy(str_auto_setpoint.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
     settings_auto_setpoint = atoi(str_auto_setpoint.ref);
 
+    //    program_id: int,     2 digits
+    int settings_program_id;
+    if (settings.find_pair(f_str("program_id")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'program_id'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'program_id' does not have an INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk str_program_id(settings.get_cur_pair_value_len());
+    if (str_program_id.ref == NULL)
+    {
+        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    os_strncpy(str_program_id.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    settings_program_id = atoi(str_program_id.ref);
+
     //    pwr_off_timer: int      4 digits
     int settings_power_off_timer;
     if (settings.find_pair(f_str("power_off_timer")) != JSON_NEW_PAIR_FOUND)
@@ -297,12 +330,12 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
         ctrl_auto(settings_auto_setpoint, settings_power_off_timer);
         break;
     case MODE_PROGRAM:
-        ctrl_program(settings_auto_setpoint);
+        ctrl_program(settings_program_id);
         break;
     default:
         break;
     }
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved!"), false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved"), false);
 }
 
 static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -328,7 +361,7 @@ static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_par
     {
         esp_diag.error(APP_GET_API_TEMP_CTRL_ADV_SETTINGS_HEAP_EXHAUSTED, str_len);
         ERROR("get_api_temp_ctrl_adv_settings heap exhausted %d", str_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted!"), false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
     struct _adv_ctrl_settings *adv_settings = get_adv_ctrl_settings();
@@ -608,7 +641,7 @@ static void post_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_pa
     adv_ctrl_settings.wup_heater_off = atoi(tmp_str);
 
     set_adv_ctrl_settings(&adv_ctrl_settings);
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved!"), false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved"), false);
 }
 
 static void get_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -745,7 +778,595 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
 
     // save remote log cfg
     set_remote_log(settings_enabled, settings_host.ref, settings_port, settings_path.ref);
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved!"), false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved"), false);
+}
+
+static void get_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_program");
+    // {"prgm_count":,"headings":[]}
+    // {"id":,"desc":""},
+    // {
+    //     "prgm_count": 3,
+    //     "headings": [
+    //         {"id": 1,"desc":"first"},
+    //         {"id": 2,"desc":"second"},
+    //         {"id": 3,"desc":"third"}
+    //     ]
+    // }
+    int str_len = 29 + 1 + 2 + (18 + 2 + 33) * program_lst->size();
+    DEBUG("program list JSON len: %d", str_len);
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(APP_GET_API_PROGRAM_HEAP_EXHAUSTED, str_len);
+        ERROR("get_api_program heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
+        return;
+    }
+    fs_sprintf(msg.ref, "{\"prgm_count\":%d,\"headings\":[", program_lst->size());
+    struct prgm_headings *ptr = program_lst->front();
+    bool first_time = true;
+    while (ptr)
+    {
+        if (first_time)
+        {
+            fs_sprintf(msg.ref + os_strlen(msg.ref), "{\"id\":%d,\"desc\":\"%s\"}",
+                       ptr->id,
+                       ptr->desc);
+            first_time = false;
+        }
+        else
+        {
+            fs_sprintf(msg.ref + os_strlen(msg.ref), ",{\"id\":%d,\"desc\":\"%s\"}",
+                       ptr->id,
+                       ptr->desc);
+        }
+        ptr = program_lst->next();
+    }
+    fs_sprintf(msg.ref + os_strlen(msg.ref), "]}");
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void get_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_program_idx");
+    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/program/"));
+    if (os_strlen(str_program_id) == 0)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No program id provided"), false);
+        return;
+    }
+    int program_id = atoi(str_program_id);
+    struct prgm *program = load_program(program_id);
+    // will need to free the memory allocated by load_program
+    if (program == NULL)
+    {
+        http_response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("Program not found"), false);
+        return;
+    }
+    // {"id":,"min_temp":,"period_count":,"periods":[]}
+    // {"wd":,"b":,"e":,"sp":},
+    // {
+    //     "id": 1,
+    //     "min_temp": 100,
+    //     "period_count": 3,
+    //     "periods": [
+    //         {"wd": 8,"b":1880,"e":1880,"sp":200},
+    //         {"wd": 8,"b":1880,"e":1880,"sp":200},
+    //         {"wd": 8,"b":1880,"e":1880,"sp":200}
+    //     ]
+    // }
+    int str_len = 48 + 1 + 2 + 5 + 4 + (24 + 1 + 4 + 4 + 5) * program->period_count;
+    DEBUG("program JSON len: %d", str_len);
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(APP_GET_API_PROGRAM_IDX_HEAP_EXHAUSTED, str_len);
+        ERROR("get_api_program_idx heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
+        delete_program(program);
+        return;
+    }
+    fs_sprintf(msg.ref, "{\"id\":%d,\"min_temp\":%d,\"period_count\":%d,\"periods\":[",
+               program->id,
+               program->min_temp,
+               program->period_count);
+    bool first_time = true;
+    int idx;
+    for (idx = 0; idx < program->period_count; idx++)
+    {
+        if (first_time)
+        {
+            fs_sprintf(msg.ref + os_strlen(msg.ref), "{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
+                       program->period[idx].day_of_week,
+                       program->period[idx].mm_start,
+                       program->period[idx].mm_end,
+                       program->period[idx].setpoint);
+            first_time = false;
+        }
+        else
+        {
+            fs_sprintf(msg.ref + os_strlen(msg.ref), ",{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
+                       program->period[idx].day_of_week,
+                       program->period[idx].mm_start,
+                       program->period[idx].mm_end,
+                       program->period[idx].setpoint);
+        }
+    }
+    fs_sprintf(msg.ref + os_strlen(msg.ref), "]}");
+    delete_program(program);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void del_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("del_api_program_idx");
+    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/program/"));
+    if (os_strlen(str_program_id) == 0)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No program id provided"), false);
+        return;
+    }
+    int program_id = atoi(str_program_id);
+    int result = del_program(program_id);
+    switch (result)
+    {
+    case ERR_PRG_NOT_FOUND:
+        http_response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("Program not found"), false);
+        break;
+    default:
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, "Program deleted", false);
+    }
+}
+
+enum program_fun
+{
+    add = 0,
+    modify
+};
+
+static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_program");
+    // {
+    //     "name" : "program_name",
+    //     "min_temp" : 100,
+    //     "period_count" : 2,
+    //     "periods" : [
+    //         {
+    //             "wd" : 8,
+    //             "b" : 100,
+    //             "e" : 200,
+    //             "sp" : 200
+    //         },
+    //         {
+    //             "wd" : 8,
+    //             "b" : 200,
+    //             "e" : 400,
+    //             "sp" : 200
+    //         }
+    //     ]
+    // }
+    Json_str settings(parsed_req->req_content, parsed_req->content_len);
+    if (settings.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    //    name: string,         33 digits
+    if (settings.find_pair(f_str("name")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'name'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_STRING)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'name' does not have an STRING value type"), false);
+        return;
+    }
+    char program_name[33];
+    os_memset(program_name, 0, 33);
+    if (settings.get_cur_pair_value_len() > 32)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    os_strncpy(program_name, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+
+    //    min_temp: int,         1 digits
+    int settings_min_temp;
+    if (settings.find_pair(f_str("min_temp")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'min_temp'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'min_temp' does not have an INTEGER value type"), false);
+        return;
+    }
+    char str_min_temp[6];
+    os_memset(str_min_temp, 0, 6);
+    if (settings.get_cur_pair_value_len() > 5)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    os_strncpy(str_min_temp, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    settings_min_temp = atoi(str_min_temp);
+
+    // settings_period_count
+    if (settings.find_pair(f_str("period_count")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'period_count'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'period_count' does not have an INTEGER value type"), false);
+        return;
+    }
+    char str_settings_period_count[4];
+    os_memset(str_settings_period_count, 0, 4);
+    if (settings.get_cur_pair_value_len() > 3)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    os_strncpy(str_settings_period_count, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+
+    struct prgm program;
+    program.min_temp = settings_min_temp;
+    program.period_count = atoi(str_settings_period_count);
+    Heap_chunk periods_mem(sizeof(struct prgm_period) * program.period_count);
+    if (periods_mem.ref == NULL)
+    {
+        esp_diag.error(APP_POST_API_PROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
+        ERROR("post_api_program heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    program.period = (struct prgm_period *)periods_mem.ref;
+
+    // periods
+    if (settings.find_pair(f_str("periods")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'periods'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_ARRAY)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'periods' does not have an ARRAY value type"), false);
+        return;
+    }
+    Json_array_str periods(settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    if (periods.size() != program.period_count)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+
+    int idx;
+    for (idx = 0; idx < program.period_count; idx++)
+    {
+        Json_str period(periods.get_elem(idx), periods.get_elem_len(idx));
+        // {
+        //     "wd" : 8,
+        //     "b" : 100,
+        //     "e" : 200,
+        //     "sp" : 200
+        // }
+        //    wd: int,         1 digits
+        if (period.find_pair(f_str("wd")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'wd'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'wd' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_wd[2];
+        os_memset(str_wd, 0, 2);
+        if (period.get_cur_pair_value_len() > 1)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_wd, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].day_of_week = (week_days)atoi(str_wd);
+        //    b: int,         4 digits
+        if (period.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'b'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'b' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_mm_start[5];
+        os_memset(str_mm_start, 0, 5);
+        if (period.get_cur_pair_value_len() > 4)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_mm_start, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].mm_start = atoi(str_mm_start);
+        //    e: int,         4 digits
+        if (period.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'e'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'e' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_mm_end[5];
+        os_memset(str_mm_end, 0, 5);
+        if (period.get_cur_pair_value_len() > 4)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_mm_end, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].mm_end = atoi(str_mm_end);
+        //    sp: int,         5 digits
+        if (period.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'sp'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'sp' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_setpoint[6];
+        os_memset(str_setpoint, 0, 6);
+        if (period.get_cur_pair_value_len() > 5)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_setpoint, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].setpoint = atoi(str_setpoint);
+    }
+    int result = add_program(program_name, &program);
+    switch (result)
+    {
+    case MAX_PRG_COUNT_REACHED:
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Cannot add more programs"), false);
+        break;
+    case ERR_SAVING_PRG:
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Error creating program"), false);
+        break;
+    case ERR_MEM_EXHAUSTED:
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
+        break;
+    default:
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Program created"), false);
+    }
+}
+
+static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("put_api_program_idx");
+    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/program/"));
+    if (os_strlen(str_program_id) == 0)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No program id provided"), false);
+        return;
+    }
+    int program_id = atoi(str_program_id);
+    Json_str settings(parsed_req->req_content, parsed_req->content_len);
+    if (settings.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    //    name: string,         33 digits
+    if (settings.find_pair(f_str("name")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'name'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_STRING)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'name' does not have an STRING value type"), false);
+        return;
+    }
+    char program_name[33];
+    os_memset(program_name, 0, 33);
+    if (settings.get_cur_pair_value_len() > 32)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    os_strncpy(program_name, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+
+    //    min_temp: int,         1 digits
+    int settings_min_temp;
+    if (settings.find_pair(f_str("min_temp")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'min_temp'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'min_temp' does not have an INTEGER value type"), false);
+        return;
+    }
+    char str_min_temp[6];
+    os_memset(str_min_temp, 0, 6);
+    if (settings.get_cur_pair_value_len() > 5)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    os_strncpy(str_min_temp, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    settings_min_temp = atoi(str_min_temp);
+
+    // settings_period_count
+    if (settings.find_pair(f_str("period_count")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'period_count'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'period_count' does not have an INTEGER value type"), false);
+        return;
+    }
+    char str_settings_period_count[4];
+    os_memset(str_settings_period_count, 0, 4);
+    if (settings.get_cur_pair_value_len() > 3)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    os_strncpy(str_settings_period_count, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+
+    struct prgm program;
+    program.min_temp = settings_min_temp;
+    program.period_count = atoi(str_settings_period_count);
+    Heap_chunk periods_mem(sizeof(struct prgm_period) * program.period_count);
+    if (periods_mem.ref == NULL)
+    {
+        esp_diag.error(APP_PUT_API_PROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
+        ERROR("put_api_program heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    program.period = (struct prgm_period *)periods_mem.ref;
+
+    // periods
+    if (settings.find_pair(f_str("periods")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'periods'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_ARRAY)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'periods' does not have an ARRAY value type"), false);
+        return;
+    }
+    Json_array_str periods(settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    if (periods.size() != program.period_count)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+
+    int idx;
+    for (idx = 0; idx < program.period_count; idx++)
+    {
+        Json_str period(periods.get_elem(idx), periods.get_elem_len(idx));
+        // {
+        //     "wd" : 8,
+        //     "b" : 100,
+        //     "e" : 200,
+        //     "sp" : 200
+        // }
+        //    wd: int,         1 digits
+        if (period.find_pair(f_str("wd")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'wd'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'wd' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_wd[2];
+        os_memset(str_wd, 0, 2);
+        if (period.get_cur_pair_value_len() > 1)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_wd, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].day_of_week = (week_days)atoi(str_wd);
+        //    b: int,         4 digits
+        if (period.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'b'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'b' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_mm_start[5];
+        os_memset(str_mm_start, 0, 5);
+        if (period.get_cur_pair_value_len() > 4)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_mm_start, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].mm_start = atoi(str_mm_start);
+        //    e: int,         4 digits
+        if (period.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'e'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'e' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_mm_end[5];
+        os_memset(str_mm_end, 0, 5);
+        if (period.get_cur_pair_value_len() > 4)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_mm_end, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].mm_end = atoi(str_mm_end);
+        //    sp: int,         5 digits
+        if (period.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'sp'"), false);
+            return;
+        }
+        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'sp' does not have an INTEGER value type"), false);
+            return;
+        }
+        char str_setpoint[6];
+        os_memset(str_setpoint, 0, 6);
+        if (period.get_cur_pair_value_len() > 5)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+            return;
+        }
+        os_strncpy(str_setpoint, period.get_cur_pair_value(), period.get_cur_pair_value_len());
+        program.period[idx].setpoint = atoi(str_setpoint);
+    }
+    int result = mod_program(program_id, program_name, &program);
+    switch (result)
+    {
+    case ERR_PRG_NOT_FOUND:
+        http_response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("Program not found"), false);
+        break;
+    case ERR_SAVING_PRG:
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Error modifying program"), false);
+        break;
+    default:
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Program modified"), false);
+    }
 }
 
 void run_test(int test_number, int test_param)
@@ -1055,6 +1676,31 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_settings"))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_temp_ctrl_settings(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/program"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_program(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/program/"), os_strlen(f_str("/api/program/")))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_program_idx(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/program/"), os_strlen(f_str("/api/program/")))) && (parsed_req->req_method == HTTP_DELETE))
+    {
+        del_api_program_idx(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/program/"), os_strlen(f_str("/api/program/")))) && (parsed_req->req_method == HTTP_PUT))
+    {
+        put_api_program_idx(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/program"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_program(ptr_espconn, parsed_req);
         return true;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_adv_settings"))) && (parsed_req->req_method == HTTP_GET))

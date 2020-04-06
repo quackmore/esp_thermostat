@@ -332,7 +332,7 @@ void delete_program(struct prgm *prog_ptr)
 
 struct prgm *load_program(int prg_id)
 {
-    if (program_lst == NULL)
+    if (program_lst->size() == 0)
     {
         esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_NO_PROGRAM_LIST);
         ERROR("load_program no program list");
@@ -456,7 +456,7 @@ struct prgm *load_program(int prg_id)
         return NULL;
     }
     int count;
-    for (count = 0; count < program_lst->size(); count++)
+    for (count = 0; count < tmp_period_count; count++)
     {
         if ((tmp_periods.get_elem(count) == NULL) || (tmp_periods.get_elem_type(count) != JSON_OBJECT))
         {
@@ -679,6 +679,31 @@ int add_program(char *name, struct prgm *prg)
     return prg_id;
 }
 
+int mod_program(int prg_id, char *name, struct prgm *prg)
+{
+    // add program heading
+    struct prgm_headings *heading_ptr = program_lst->front();
+    while (heading_ptr)
+    {
+        if (heading_ptr->id == prg_id)
+            break;
+        heading_ptr = program_lst->next();
+    }
+    if(heading_ptr == NULL)
+        return ERR_PRG_NOT_FOUND;
+    os_strncpy(heading_ptr->desc, name, 32);
+    if (saved_prgm_list_not_updated())
+        save_prgm_list();
+    // override program id
+    prg->id = prg_id;
+    // write program file
+    if (!save_program(prg))
+        return ERR_SAVING_PRG;
+    espmem.stack_mon();
+    // return id
+    return prg_id;
+}
+
 int del_program(int prg_id)
 {
     // delete the file
@@ -716,12 +741,12 @@ int del_program(int prg_id)
     {
         // return the program_id
         program_lst->remove();
-    if (saved_prgm_list_not_updated())
-        save_prgm_list();
+        if (saved_prgm_list_not_updated())
+            save_prgm_list();
         return prg_id;
     }
     else
     {
-        return -1;
+        return ERR_PRG_NOT_FOUND;
     }
 }

@@ -9,7 +9,8 @@
 #ifndef __APP_TEMP_CTRL_PROGRAM_HPP__
 #define __APP_TEMP_CTRL_PROGRAM_HPP__
 
-enum week_days{
+enum week_days
+{
     sun = 0,
     mon,
     tue,
@@ -23,7 +24,7 @@ enum week_days{
 struct prgm_headings
 {
     int id;
-    char desc[33];    
+    char desc[33];
 };
 
 #define MAX_PROGRAM_COUNT 10
@@ -45,20 +46,22 @@ struct prgm
     int id;
     int min_temp;
     int period_count;
-    struct prgm_period *period; // struct prgm_period period[] 
+    struct prgm_period *period; // struct prgm_period period[]
 };
 
-extern struct prgm *current_program;
-
-#define MAX_PRG_COUNT_REACHED (-1)
-#define ERR_SAVING_PRG (-2)
-#define ERR_MEM_EXHAUSTED (-3)
-
-int add_program(char *, struct prgm *); // return id or <0 if fails
-int del_program(int);                   // return id or <0 if fails
-
-void delete_program(struct prgm *);
-struct prgm *load_program(int idx);
-char *get_cur_program_name(int);
+#define MAX_PRG_COUNT_REACHED (-1)                         // errors codes for add_program and del_program
+#define ERR_SAVING_PRG (-2)                                //
+#define ERR_MEM_EXHAUSTED (-3)                             //
+#define ERR_PRG_NOT_FOUND (-4)                             //
+                                                           //
+int add_program(char *, struct prgm *);                    // return id or <0 if fails
+int del_program(int);                                      // return id or <0 if fails
+int mod_program(int prg_id, char *name, struct prgm *prg); // return id or <0 if fails
+                                                           //
+extern struct prgm *current_program;                       //
+                                                           //
+char *get_cur_program_name(int);                           //
+struct prgm *load_program(int idx);                        //
+void delete_program(struct prgm *);                        // delete a struct prgm allocated on heap
 
 #endif
