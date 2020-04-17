@@ -1,9 +1,9 @@
 const esp8266 = {
-  "url": "http://192.168.1.105",
+  // "url": "http://192.168.1.105",
   // "url": "http://192.168.1.185",
-  // "url": "",
-  // "cors": false
-  "cors": true
+  "url": "",
+  "cors": false
+  // "cors": true
 };
 
 function esp_get_current_vars(success_cb, error_cb) {
