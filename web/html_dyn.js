@@ -1,9 +1,9 @@
 const esp8266 = {
-  // "url": "http://192.168.1.105",
+  "url": "http://192.168.1.105",
   // "url": "http://192.168.1.185",
-  "url": "",
-  "cors": false
-  // "cors": true
+  // "url": "",
+  // "cors": false
+  "cors": true
 };
 
 function esp_get_current_vars(success_cb, error_cb) {
@@ -284,18 +284,24 @@ function esp_save_adv_ctrl_settings(get_data, success_cb, error_cb) {
 
 //  CURRENT VALUES
 
-setInterval(update_collapseCurrent, 15000);
+var current_on_show = Boolean(true);
 
 $(document).ready(function () {
   setTimeout(function () {
     $('.modal').modal('hide');
   }, 500);
+  current_on_show = Boolean(true);
   update_collapseCurrent();
   update_version();
 });
 
 $('#collapseCurrent').on('show.bs.collapse', function () {
+  current_on_show = Boolean(true);
   update_collapseCurrent();
+});
+
+$('#collapseCurrent').on('hidden.bs.collapse', function () {
+  current_on_show = Boolean(false);
 });
 
 function update_version() {
@@ -310,6 +316,9 @@ function update_collapseCurrent() {
   esp_get_current_vars(update_current_vars, function (xhr) {
     alert("" + xhr.responseText);
   });
+  if (current_on_show) {
+    setTimeout(update_collapseCurrent, 10000);
+  }
 }
 
 function update_current_vars(data) {
@@ -399,6 +408,10 @@ $('#settings_reset').click(function () {
 });
 
 $('#settings_save').click(function () {
+  if (!($('#program_name').val()) && (parseInt($('#ctrl_mode').val()) == 3)) {
+    alert("Cannot save null program...");
+    return;
+  }
   esp_save_settings(jsonify_settings,
     function (data) {
       alert(data.msg);
@@ -505,7 +518,12 @@ function jsonify_settings() {
     to_be_saved_settings.manual_pulse_on = parseInt($('#cycle_on').val());
   to_be_saved_settings.manual_pulse_off = parseInt($('#cycle_off').val());
   to_be_saved_settings.auto_setpoint = parseFloat($('#setpoint').val()) * 10;
-  to_be_saved_settings.program_id = parseInt($('#program_name').val());
+  if ($('#program_name').val()) {
+    to_be_saved_settings.program_id = parseInt($('#program_name').val());
+  }
+  else {
+    to_be_saved_settings.program_id = 0;
+  }
   if ($('#off_timer_en').val() == 0)
     to_be_saved_settings.power_off_timer = 0;
   else
@@ -548,8 +566,8 @@ function update_program_list(data) {
       // check that selected is into the headings
       var selected_found = false;
       for (var ii = 0; ii < data.headings.length; ii++) {
-        if (selected == data.headings[ii].id) { 
-          selected_found = true; 
+        if (selected == data.headings[ii].id) {
+          selected_found = true;
           break;
         }
       }
@@ -568,6 +586,22 @@ function update_program_list(data) {
     esp_get_program(selected, update_prg_periods, function (xhr) {
       alert("" + xhr.responseText);
     });
+  }
+  else {
+    // there are no programs, same as new
+    $("#prg_select_row").addClass('d-none');
+    $("#sel_prg_name").val("");
+    $("#prg_rename_row").removeClass('d-none');
+    var new_prg_periods = {
+      "id": 0,
+      "min_temp": NaN,
+      "period_count": 1,
+      "periods": []
+    };
+    var new_period = new Object();
+    new_prg_periods.periods.push(new_period);
+    cur_prg_periods = new_prg_periods;
+    update_prg_form();
   }
 }
 
@@ -736,18 +770,34 @@ $('#programs_new').click(function () {
 });
 
 $('#programs_delete').click(function () {
-  esp_del_program($('#program_list option:selected').val(),
+  esp_get_settings(
     function (data) {
-      alert(data.msg);
-      update_collapsePrograms();
+      if ((data.ctrl_mode == 3) && (data.program_id == $('#program_list option:selected').val())) {
+        alert("Cannot delete program in use...");
+        return;
+      }
+      else
+        delete_the_program();
     }, function (xhr) {
       alert("" + xhr.responseText);
     });
 });
 
+function delete_the_program() {
+  esp_del_program($('#program_list option:selected').val(),
+    function (data) {
+      alert(data.msg);
+      setTimeout(function () { update_collapsePrograms() }, 500);;
+    }, function (xhr) {
+      alert("" + xhr.responseText);
+    });
+}
+
 $('#programs_save').click(function () {
   // check for empty field
   var empty_fields_exist = false;
+  if (!($("#sel_prg_name").val()) || !(cur_prg_periods.min_temp))
+    empty_fields_exist = true;
   for (var ii = 0; ii < cur_prg_periods.periods.length; ii++) {
     if (!('wd' in cur_prg_periods.periods[ii]) || (cur_prg_periods.periods[ii].wd == null))
       empty_fields_exist = true;
@@ -780,7 +830,7 @@ $('#programs_save').click(function () {
       esp_post_program(cur_prg_periods,
         function (data) {
           alert(data.msg);
-          update_collapsePrograms();
+          setTimeout(function () { update_collapsePrograms() }, 500);;
         }, function (xhr) {
           alert("" + xhr.responseText);
         });
@@ -802,7 +852,7 @@ $('#programs_save').click(function () {
       esp_put_program(cur_prg_periods,
         function (data) {
           alert(data.msg);
-          update_collapsePrograms();
+          setTimeout(function () { update_collapsePrograms() }, 500);;
         }, function (xhr) {
           alert("" + xhr.responseText);
         });

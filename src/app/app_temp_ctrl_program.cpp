@@ -224,6 +224,11 @@ static void remove_prgm_list(void)
 static void save_prgm_list(void)
 {
     ALL("save_prgm_list");
+    if (program_lst->size() == 0)
+    {
+        remove_prgm_list();
+        return;
+    }
     if (saved_prgm_list_not_updated())
         remove_prgm_list();
     else
@@ -689,7 +694,7 @@ int mod_program(int prg_id, char *name, struct prgm *prg)
             break;
         heading_ptr = program_lst->next();
     }
-    if(heading_ptr == NULL)
+    if (heading_ptr == NULL)
         return ERR_PRG_NOT_FOUND;
     os_strncpy(heading_ptr->desc, name, 32);
     if (saved_prgm_list_not_updated())
