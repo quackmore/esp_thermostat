@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
   <link rel="shortcut icon" type="image/png" href="https://img.icons8.com/ios/50/000000/thermometer-automation.png" />
-
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
     integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -109,6 +109,13 @@
                   <input type="number" value="10" min="0" max="30" step="0.1" class="form-control" id="setpoint">
                 </div>
               </div>
+              <div class="form-group row" id="program_select">
+                <label for="program_name" class="col-sm-6 col-form-label text-left">Program</label>
+                <div class="input-group col-sm-6">
+                  <select class="custom-select" id="program_name">
+                  </select>
+                </div>
+              </div>
               <div id="power_off_timer">
                 <hr>
                 <div class="form-group row">
@@ -140,13 +147,146 @@
         <div class="card">
           <div class="card-header" id="headingThree">
             <h5 class="mb-0">
+              <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapsePrograms"
+                aria-expanded="true" aria-controls="collapsePrograms">
+                PROGRAMS
+              </button>
+            </h5>
+          </div>
+
+          <div id="collapsePrograms" class="collapse" aria-labelledby="headingThree" data-parent="#accordion">
+            <div class="card-body">
+              <div class="form-group row" id="prg_select_row">
+                <label for="program_list" class="col-sm-6 col-form-label text-left">Program</label>
+                <div class="input-group col-sm-6">
+                  <select class="custom-select" id="program_list">
+                  </select>
+                </div>
+              </div>
+              <div class="form-group row" id="prg_rename_row">
+                <label for="sel_prg_name" class="col-sm-6 col-form-label text-left">Name</label>
+                <div class="input-group col-sm-6">
+                  <input type="text" maxlength="32" class="form-control" id="sel_prg_name">
+                </div>
+              </div>
+              <form id=prg_periods>
+                <div class="form-group row">
+                  <label for="prg_def_sp" class="col-sm-6 col-form-label text-left">Default setpoint</label>
+                  <div class="input-group col-sm-6">
+                    <input type="number" min="0" max="99" step="0.1" placeholder="°C" class="form-control"
+                      id="prg_def_sp" onchange="update_def_sp();">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="col mx-0 px-0">
+                    <button type="button" class="btn btn-default" placeholder="day" onclick="add_prg_period(0);">
+                      <i class="fa fa-plus-circle" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="col-xs-2 ml-0 pl-0 mr-2 pr-0">
+                    <select class="custom-select" id="wk_day_0" onchange="update_wd_period(0);">
+                      <option value="1">Mon</option>
+                      <option value="2">Tue</option>
+                      <option value="3">Wed</option>
+                      <option value="4">Thu</option>
+                      <option value="5">Fri</option>
+                      <option value="6">Sat</option>
+                      <option value="7">Sun</option>
+                      <option value="8">All</option>
+                    </select>
+                  </div>
+                  <div class="col-xs-1 mx-0 px-0">
+                    <input type="number" min="0" max="24" step="1" placeholder="hh" class="form-control" id="start_hh_0"
+                      onchange="update_start_period(0);">
+                  </div>
+                  <div class="col-xs-1 ml-0 mr-2 px-0">
+                    <input type="number" min="0" max="59" step="1" placeholder="mm" class="form-control" id="start_mm_0"
+                      onchange="update_start_period(0);">
+                  </div>
+                  <div class="col-xs-1 mx-0 px-0">
+                    <input type="number" min="0" max="24" step="1" placeholder="hh" class="form-control" id="end_hh_0"
+                      onchange="update_end_period(0);">
+                  </div>
+                  <div class="col-xs-1 ml-0 mr-2 px-0">
+                    <input type="number" min="0" max="59" step="1" placeholder="mm" class="form-control" id="end_mm_0"
+                      onchange="update_end_period(0);">
+                  </div>
+                  <div class="col-xs-1 mx-0 px-0">
+                    <input type="number" min="0" max="99" step="0.1" placeholder="°C" class="form-control" id="sp_0"
+                      onchange="update_sp_period(0);">
+                  </div>
+                  <div class="col mx-0 px-0">
+                    <button type="button" class="btn btn-default" onclick="del_prg_period(0);">
+                      <i class="fa fa-trash" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="col mx-0 px-0">
+                    <button type="button" class="btn btn-default" onclick="add_prg_period(0);">
+                      <i class="fa fa-plus-circle" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+              </form>
+              <div><br></div>
+              <div class="row">
+                <div class="mx-auto">
+                  <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
+                    <div class="btn-group mr-2" role="group" aria-label="First group">
+                      <button type="button" class="btn btn-primary" id="programs_reset">Reset</button>
+                    </div>
+                    <div class="btn-group mr-2" role="group" aria-label="Second group">
+                      <button type="button" class="btn btn-primary" id="programs_rename">Rename</button>
+                    </div>
+                    <div class="btn-group mr-2" role="group" aria-label="Third group">
+                      <button type="button" class="btn btn-primary" id="programs_new">New</button>
+                    </div>
+                    <div class="btn-group mr-2" role="group" aria-label="Fourth group">
+                      <button type="button" class="btn btn-primary" data-toggle="modal"
+                        data-target="#confirmDelete">Delete</button>
+                    </div>
+                    <div class="modal fade" id="confirmDelete" tabindex="-1" role="dialog"
+                      aria-labelledby="confirmDeleteLabel" aria-hidden="true">
+                      <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title" id="confirmDeleteLabel">Confirm Delete</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                              <span aria-hidden="true">&times;</span>
+                            </button>
+                          </div>
+                          <div class="modal-body">
+                            <p>Current program will be deleted.</p>
+                            <p>There will be no way to recover it.</p>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" data-dismiss="modal"
+                              id="programs_delete">Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="btn-group mr-2" role="group" aria-label="Fifh group">
+                      <button type="button" class="btn btn-primary" id="programs_save">Save</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header" id="headingFour">
+            <h5 class="mb-0">
               <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseAdvSettings"
                 aria-expanded="false" aria-controls="collapseAdvSettings">
                 ADVANCED CONTROL SETTINGS
               </button>
             </h5>
           </div>
-          <div id="collapseAdvSettings" class="collapse" aria-labelledby="headingThree" data-parent="#accordion">
+          <div id="collapseAdvSettings" class="collapse" aria-labelledby="headingFour" data-parent="#accordion">
             <div class="card-body">
               <div class="form-group row">
                 <label for="adv_sett_kp" class="col-sm-6 col-form-label text-left">Kp</label>
@@ -246,7 +386,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header" id="headingFour">
+          <div class="card-header" id="headingFive">
             <h5 class="mb-0">
               <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseRemoteLogSettings"
                 aria-expanded="false" aria-controls="collapseRemoteLogSettings">
@@ -254,7 +394,7 @@
               </button>
             </h5>
           </div>
-          <div id="collapseRemoteLogSettings" class="collapse" aria-labelledby="headingFour" data-parent="#accordion">
+          <div id="collapseRemoteLogSettings" class="collapse" aria-labelledby="headingFive" data-parent="#accordion">
             <div class="card-body">
               <div class="form-group row">
                 <label for="rl_enabled" class="col-sm-6 col-form-label text-left">Remote log</label>
@@ -299,15 +439,15 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header" id="headingFive">
+          <div class="card-header" id="headingSix">
             <h5 class="mb-0">
               <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseDiagnosticEvents"
                 aria-expanded="false" aria-controls="collapseDiagnosticEvents">
-                DIAGNOSTIC EVENTS
+                EVENTS JOURNAL
               </button>
             </h5>
           </div>
-          <div id="collapseDiagnosticEvents" class="collapse" aria-labelledby="headingFive" data-parent="#accordion">
+          <div id="collapseDiagnosticEvents" class="collapse" aria-labelledby="headingSix" data-parent="#accordion">
             <div class="card-body">
               <div class="table-responsive text-nowrap table-sm small">
                 <table class="table table-striped" id="diag_event_table">
@@ -357,6 +497,7 @@
     </div>
     <div class="card-footer text-muted ">
       <div>By <a href="mailto:quackmore-ff@yahoo.com">Quackmore</a></div>
+      <div id="app_version">version </div>
       <div><a href="https://icons8.com/icon/7240/thermometer-automation">Thermometer Automation icon by Icons8</a></div>
     </div>
   </div>
@@ -364,7 +505,6 @@
     <div class="modal-dialog modal-sm">
       <div class="modal-content" style="width: 48px">
         <span class="spinner-border" role="status"></span>
-        <span class="fa fa-spinner fa-spin fa-3x"></span>
       </div>
     </div>
   </div>

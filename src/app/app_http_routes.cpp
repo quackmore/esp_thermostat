@@ -335,7 +335,7 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     default:
         break;
     }
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved"), false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
 static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -641,7 +641,7 @@ static void post_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_pa
     adv_ctrl_settings.wup_heater_off = atoi(tmp_str);
 
     set_adv_ctrl_settings(&adv_ctrl_settings);
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved"), false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
 static void get_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -778,7 +778,7 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
 
     // save remote log cfg
     set_remote_log(settings_enabled, settings_host.ref, settings_port, settings_path.ref);
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Settings saved"), false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
 static void get_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -916,15 +916,9 @@ static void del_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
         http_response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("Program not found"), false);
         break;
     default:
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, "Program deleted", false);
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Program deleted\"}"), false);
     }
 }
-
-enum program_fun
-{
-    add = 0,
-    modify
-};
 
 static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
@@ -1151,7 +1145,7 @@ static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parse
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
         break;
     default:
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Program created"), false);
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Program created\"}"), false);
     }
 }
 
@@ -1365,7 +1359,7 @@ static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Error modifying program"), false);
         break;
     default:
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Program modified"), false);
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Program modified\"}"), false);
     }
 }
 
