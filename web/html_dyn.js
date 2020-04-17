@@ -1,9 +1,9 @@
 const esp8266 = {
-  "url": "http://192.168.1.105",
+  // "url": "http://192.168.1.105",
   // "url": "http://192.168.1.185",
-  // "url": "",
-  // "cors": false
-  "cors": true
+  "url": "",
+  "cors": false
+  // "cors": true
 };
 
 function esp_get_current_vars(success_cb, error_cb) {
@@ -759,7 +759,7 @@ $('#programs_save').click(function () {
       empty_fields_exist = true;
   }
   if (empty_fields_exist) {
-    alert("There are empty fields...")
+    alert("There are empty fields...");
     return;
   }
   cur_prg_periods.name = $("#sel_prg_name").val();
