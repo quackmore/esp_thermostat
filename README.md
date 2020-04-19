@@ -6,11 +6,14 @@ Thermostat app based on [ESPBOT](https://github.com/quackmore/espbot_2.0) and [e
 
 The thermostat APP require a DHT-22 for temperature measurement (on pin D5) and a relay (on pin D2) for controlling an external heater.
 
-The thermostat APP has three working modes:
+The thermostat APP has various working modes:
 
 - OFF
 - MANUAL: when working in manual mode the thermostat can keep the heater always ON or can cycle it ON and OFF regardless of the temperature readings.
+A 'sleep timer' is available, you can specify how many minutes you want the thermostat to stay in MANUAL mode before going OFF.
 - AUTO: when working in auto mode the thermostat will drive the heater trying to reach the temperature setpoint. A PID algorithm is used.
+A 'sleep timer' is available, you can specify how many minutes you want the thermostat to stay in AUTO mode before going OFF.
+- PROGRAM: a 'program' is a sequence of time intervals specified by 'day of the week', 'start time', 'end time' and 'temperature setpoint'. A default 'temperature setpoint' is also provided to be used when no other setpoint is available. Up to 10 programs can be pre-defined an stored on the device, see 'Configuring and using Programs' later on.
 
 The thermostat APP can log any change in temperature reading, working mode and heater status to an external host using the following format:
 
@@ -30,6 +33,43 @@ The thermostat APP can log any change in temperature reading, working mode and h
     4 - temperature setpoint_change
 
 The thermostat APP hosts a web server and can be controlled by a web interface connecting your browser to your_device_IP_address.
+
+## Using the web interface (best viewed with Chrome)
+
+### Configuring and using Programs
+
+A program must be defined into the section 'PROGRAMS' then it can be used into se section 'CONTROL SETTINGS'.
+
+Interface commands:
+
+- 'RESET' reset the interface requesting the information saved on the device.
+All changes that weren't saved are lost.
+- 'RENAME' allows to rename the current program
+- 'NEW' creates a new program
+- 'DELETE' delete current programs
+- 'SAVE' save the current program
+- '+' button insert a new line before the current one
+- 'trash button' remove the current line
+
+#### Programs examples
+
+##### Every day program
+
+![Every day program](pics/everyday-program.png "Every day program")
+
+This is a simple program that says: for whichever day ('All') keep the temperature close to 20°C between 07:30 and 21:00.
+Outside that time interval don't let the temperature go below 10°C.
+
+##### Weekly program
+
+![Weekly program](pics/weekly-program.png)
+
+This is a more complex program that says:
+
+- on working days ('Mon' to 'Fri') keep the temperature close to 20°C between 06:30 and 08:00 and between 18:00 and 22:00.
+- on working days ('Mon' to 'Fri') keep the temperature close to 18°C between 08:00 and 18:00.
+- on weekends ('Sat' and 'Sun') keep the temperature close to 20°C between 07:30 and 22:00.
+- never let the temperature go below 10°C.
 
 ## Building the APP
 
@@ -69,26 +109,26 @@ The thermostat APP hosts a web server and can be controlled by a web interface c
 
 - wifi connection: without configuration the ESP device will work as a Wifi AP with SSID=ESPBOT-chip_id and password=espbot123456
 
-      curl --location --request POST "http://{{host}}/api/wifi/cfg" \
-      --data "{
+      curl --location --request POST 'http://{{host}}/api/wifi/cfg' \
+      --data-raw '{
           "station_ssid": "your_Wifi_SSID",
           "station_pwd": "your_Wifi_password"
-      }"
+      }
   this will make the device stop working as AP and connect to your Wifi AP
 - device name (and SSID)
 
       curl --location --request POST "http://{{host}}/api/espbot/cfg" \
       --header "Content-Type: application/json" \
-      --data "{
+      --data-raw '{
           "espbot_name": "your_device_name"
-      }"
+      }'
 - enable cron (will run temperature reading and control)
 
-      curl --location --request POST "http://{{host}}/api/wifi/cfg" \
-      --data "{
-          \"station_ssid\": \"your_Wifi_SSID\",
-          \"station_pwd\": \"your_Wifi_passwordthermostat.local\"
-      }"
+      curl --location --request POST 'http://{{host}}/api/cron' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "cron_enabled": 1
+      }'
 - enable mDns (if you want to access your device as <http://your_device_name.local>)
 
       curl --location --request POST 'http://{{host}}/api/mdns' \
