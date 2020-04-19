@@ -11,13 +11,13 @@
 
 enum week_days
 {
-    sun = 0,
-    mon,
+    mon = 1,
     tue,
     wed,
     thu,
     fri,
     sat,
+    sun,
     everyday = 8
 };
 
