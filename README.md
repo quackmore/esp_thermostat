@@ -143,7 +143,7 @@ This is a more complex program that says:
       --data-raw '{
           "mdns_enabled": 0
       }'
-- setup SNTP and timezone
+- setup SNTP and timezone (use this function to correct the timezone for daylight saving time)
 
       curl --location --request POST 'http://{{host}}/api/sntp' \
       --header 'Content-Type: application/json' \

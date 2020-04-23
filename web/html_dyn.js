@@ -22,6 +22,7 @@ function esp_get_current_vars(success_cb, error_cb) {
   });
   // let data = {
   //   ctrl_date: 1573157694,
+  //   timezone: 1,
   //   current_temp: 200,
   //   heater_status: 0,
   //   auto_setpoint: 200,
@@ -325,6 +326,8 @@ function update_current_vars(data) {
   var week_day = new Array("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun");
   $("#thermo_date").text(function () {
     var date = new Date(data.ctrl_date * 1000);
+    date = new Date(date.getTime() + date.getTimezoneOffset() * 60000 + data.timezone * 60 * 60000);
+
     return week_day[date.getDay()] +
       " " +
       (date.getHours() > 9 ? date.getHours() : "0" + date.getHours()) +

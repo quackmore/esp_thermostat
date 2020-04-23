@@ -78,6 +78,7 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
     ALL("get_api_temp_ctrl_vars");
     // {
     //   "ctrl_date": uint32,                 11 digits
+    //   "timezone": int                       3 digits
     //   "current_temp": int,                  5 digits
     //   "heater_status": int,                 1 digit
     //   "auto_setpoint": int,                 4 digits
@@ -86,7 +87,7 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
     //   "pwr_off_timer_started_on": uint32,  11 digits
     //   "pwr_off_timer": int                  4 digits
     // }
-    int str_len = 140 + 11 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1;
+    int str_len = 152 + 11 + 3 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
@@ -96,12 +97,15 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
         return;
     }
     struct date *current_time = get_current_time();
-    // {"ctrl_date":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":}
+    // {"ctrl_date":,"timezone":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":}
     fs_sprintf(msg.ref,
                "{\"ctrl_date\":%d,"
+               "\"timezone\":%d,",
+               (current_time->timestamp), // sending UTC time
+               esp_time.get_timezone());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"current_temp\":%d,"
                "\"heater_status\":%d,",
-               (current_time->timestamp), // sending UTC time
                get_temp(0),
                (is_heater_on() ? 1 : 0));
     fs_sprintf(msg.ref + os_strlen(msg.ref),
