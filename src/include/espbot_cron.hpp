@@ -9,7 +9,7 @@
 #ifndef __APP_CRON_HPP__
 #define __APP_CRON_HPP__
 
-#define CRON_MAX_JOBS 10
+#define CRON_MAX_JOBS 30
 
 struct date
 {
@@ -47,7 +47,7 @@ void cron_sync(void);
  *         < 0  -> error
  */
 
-int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(void));
+int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(void *), void *param);
 
 /*
  * delete job_id

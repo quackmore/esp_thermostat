@@ -19,6 +19,7 @@ class TimeDate
 {
 private:
   bool _sntp_enabled;
+  bool _sntp_running;
   signed char _timezone;
 
   int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR

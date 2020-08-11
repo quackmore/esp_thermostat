@@ -16,7 +16,6 @@
     integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
     integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.17.0/dist/bootstrap-table.min.css">
 
   <!-- Custom styles for this template -->
   <link href="sidebar.css" rel="stylesheet">
@@ -46,7 +45,7 @@
     <div id="page-content-wrapper">
 
       <nav class="navbar navbar-expand-lg navbar-dark border-bottom" id=content-navbar>
-        <span id="content-title">Current Status</span>
+        <span id="content-title">Info & Credits</span>
         <button class="btn ml-auto" id="menu-toggle">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -56,24 +55,39 @@
         <div class="card-columns mt-3">
           <div class="card border-info">
             <div class="card-body">
-              <h4 id="sm_time" class="text-center">--- --:--</h4>
-              <h1 id="sm_temp" class="text-center">--.--</h1>
-              <h2 id="sm_humi" class="text-center">--.-%</h2>
+              <h5 class="card-title my-auto"><i class="fa fa-code" aria-hidden="true"></i> Info</h5>
+              <p class="card-text"></p>
+              <p class="card-text"><img src="https://img.icons8.com/ios/50/000000/carpenter.png" /> Built by <a
+                  href="mailto:quackmore-ff@yahoo.com">Quackmore</a></p>
+              <p class="card-text"><a href="https://github.com/quackmore">https://github.com/quackmore</a></p>
             </div>
           </div>
           <div class="card border-info">
             <div class="card-body">
-              <h4 id="sm_ctrl_mode" class="text-center">OFF</h4>
-              <h4 id="sm_ctrl_program" class="text-center d-none">---</h4>
-              <h4 id="sm_ctrl_sp" class="text-center d-none">---</h4>
-              <h4 id="sm_heater_status" class="text-center">heater OFF</h4>
+              <h5 class="card-title my-auto"><i class="fa fa-code-fork" aria-hidden="true"></i> Credits</h5>
+              <p class="card-text"></p>
+              <p class="card-text">
+                <img src="https://img.icons8.com/ios/50/000000/carpenter.png" />
+                Built with <i class="fa fa-heart" aria-hidden="true"></i> but mainly with
+              </p>
+              <p class="card-text"><a href="https://getbootstrap.com/">Bootstrap</a></p>
+              <p class="card-text"><a href="https://jquery.com/">jQuery</a></p>
+              <p class="card-text"><a href="https://popper.js.org/">popper.js</a></p>
+              <p class="card-text"><a href="https://bootstrap-table.com/">Bootstrap-Table</a></p>
+              <p class="card-text"><a href="https://fontawesome.com/">Font Awesome</a></p>
+              <p class="card-text"><a href="https://icons8.com/">Icons8</a></p>
             </div>
           </div>
-          <div id="sm_pwr_off" class="card border-info d-none">
+          <div class="card border-info">
             <div class="card-body">
-              <h4 class="text-center">Powering OFF in</h4>
-              <h1 id="sm_ctrl_pwr_off" class="text-center">---</h1>
-              <h4 class="text-center">minutes</h4>
+              <h5 class="card-title my-auto"><i class="fa fa-code-fork" aria-hidden="true"></i> Credits</h5>
+              <p class="card-text"></p>
+              <p class="card-text"><img src="https://img.icons8.com/ios/50/000000/thermometer-automation.png" />
+                <a href="https://icons8.com/icon/1112/timer"> Timer icon by Icons8</a>
+              </p>
+              <p class="card-text"><img src="https://img.icons8.com/ios/50/000000/carpenter.png" />
+                <a href="https://icons8.com/icon/63386/carpenter"> Carpenter icon by Icons8</a>
+              </p>
             </div>
           </div>
         </div>
@@ -82,15 +96,7 @@
     <!-- End Of Page Content #########################################################################-->
   </div>
   <!-- /#wrapper -->
-  <!-- #spinner while awaiting for page load -->
-  <div class="modal fade" id="awaiting" data-backdrop="static" data-keyboard="false" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0" style="background-color: transparent;">
-        <span class="spinner-border mx-auto" role="status" style="width: 3rem; height: 3rem;"></span>
-      </div>
-    </div>
-  </div>
-  <!-- /#spinner while awaiting for page load -->
+
   <!-- Bootstrap core JavaScript -->
   <!-- jQuery first, then Popper.js, then Bootstrap JS, then custom script -->
   <!-- don't use slim if you need ajax -->
@@ -102,12 +108,6 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
     integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
     crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/bootstrap-table@1.17.0/dist/bootstrap-table.min.js"></script>
-  <script src="shared.js"></script>
-  <script src="home.js"></script>
-  <script type="text/javascript">
-    $('#awaiting').modal('show');
-  </script>
   <!-- Menu Toggle Script -->
   <script>
     $("#menu-toggle").click(function (e) {

@@ -1,0 +1,2661 @@
+openapi: 3.0.0
+
+info:
+  title: ESP_thermostat APIs
+  version: 2.0.0
+  description: >
+    These APIs are for reading, setting and controlling ESP_thermostat APP. 
+
+servers:
+  - url: http://{host}:{port}/{basePath}
+    description: The generic ESPBOT device
+    variables:
+      host:
+        enum:
+        - '192.168.10.1'
+        - '192.168.1.105'
+        default: '192.168.10.1'
+      port:
+        enum:
+        - '80'
+        default: '80'
+      basePath:
+        enum:
+        - api
+        default: api
+
+paths:
+# espbot APIs
+  /cron:
+    get:
+      description: Returns cron settings (enabled or disabled)
+      summary: Find cron status
+      operationId: getCron
+      responses:
+        '200':
+          description: the cron status (enabled/disabled)
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/cron_status'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets cron status (enabled or disabled)
+      summary: Enable/Disable cron
+      operationId: setCron
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/cron_status'
+      responses:
+        '200':
+          description: Successful, return current cron status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/cron_status'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /debug/lastReset:
+    get:
+      description: Returns information about last time the device rebooted.
+      summary: Find last reset info
+      operationId: getLastReset
+      responses:
+        '200':
+          description: Last reset info
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/lastReset'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /debug/hexMemDump:
+    post:
+      description: Returns the content of a selected RAM memory interval as hexadecimal
+      summary: Find memory content (hex)
+      operationId: getHexMemDump
+      requestBody:
+        description: The memory interval range
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/memInterval'
+      responses:
+        '200':
+          description: The memory interval content
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/memIntervalHexContent'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /debug/memDump:
+    post:
+      description: Returns the content of a selected RAM memory interval as text
+      summary: Find memory content (text)
+      operationId: getMemDump
+      requestBody:
+        description: The memory interval range
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/memInterval'
+      responses:
+        '200':
+          description: The memory interval content
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/memIntervalContent'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /debug/memInfo:
+    get:
+      description: Returns a summary of RAM memory usage
+      summary: Find RAM memory usage
+      operationId: getMemInfo
+      responses:
+        '200':
+          description: The current RAM memory usage
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/memInfo'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /deviceName:
+    get:
+      description: Returns the device name
+      summary: Find device name
+      operationId: getDeviceName
+      responses:
+        '200':
+          description: The current device name
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/deviceName'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets device name
+      summary: Set device name
+      operationId: setDeviceName
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/deviceName'
+      responses:
+        '200':
+          description: Successful, returns current device name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/deviceName'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /diagnostic:
+    get:
+      description: Returns the last diagnostic events recorded by the device
+      summary: Find device diagnostic
+      operationId: getDiagnosticEvents
+      responses:
+        '200':
+          description: The last diagnostic events
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/diagnosticEvents'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Acknowledges the diagnostic events.
+      summary: Acknowledge diagnostic.
+      operationId: ackDiagnosticEvents
+      responses:
+        '200':
+          description: The diagnostic events were acknowledged. 
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/success'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /diagnostic/cfg:
+    get:
+      description: Returns the diagnostic config (which events are reported to the LED and to the serial log).
+      summary: Find current diagnostic config
+      operationId: getDiagnosticCfg
+      responses:
+        '200':
+          description: The current diagnostic config
+          content:
+            application/json: 
+              schema:
+                $ref: '#/components/schemas/diagnosticCfg'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets diagnostic config
+      summary: Set diagnostic config
+      operationId: setDiagnosticCfg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/diagnosticCfg'
+      responses:
+        '200':
+          description: Successful, returns current diagnostic config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/diagnosticCfg'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /file:
+    get:
+      description: Returns a list of the files on the device.
+      summary: File list
+      operationId: getFileList
+      responses:
+        '200':
+          description: The file list
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/fileList'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /file/{filename}:
+    get:
+      description: Returns the content of a file
+      summary: Find file
+      operationId: getFile
+      parameters:
+      - name: filename
+        in: path
+        description: The file name
+        required: true
+        schema:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        style: simple
+      responses:
+        '200':
+          description: The file content
+          content:
+            'application/octet-stream':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+            'text/css':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+            'text/html':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+            'text/js':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+            'text/plain':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+            'image/jpeg':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+            'image/png':
+              schema:
+                type: string
+                format: binary
+                minLength: 0
+                maxLength: 4194304
+                pattern: '[\x00-\xFF]{0,4194304}'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Create a new file (to create files bigger than 2048 bytes, first create then modify, appending new content)
+      summary: Create a file
+      operationId: createFile
+      parameters:
+      - name: filename
+        in: path
+        description: The file name
+        required: true
+        schema:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        style: simple
+      requestBody:
+        required: true
+        description: The file content
+        content:
+          'application/octet-stream':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/css':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/html':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/js':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/plain':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'image/jpeg':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'image/png':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+      responses:
+        '201':
+          description: File successfully created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        '400':
+          description: Bad request, no filename provided or file already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    put:
+      description: Append content to the specified file
+      summary: Modify a file
+      operationId: appendToFile
+      parameters:
+      - name: filename
+        in: path
+        description: The file name
+        required: true
+        schema:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        style: simple
+      requestBody:
+        required: true
+        description: The file content
+        content:
+          'application/octet-stream':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/css':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/html':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/js':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'text/plain':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'image/jpeg':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+          'image/png':
+            schema:
+              type: string
+              format: binary
+              minLength: 0
+              maxLength: 2048
+              pattern: '[\x00-\xFF]{0,2048}'
+      responses:
+        '200':
+          description: File successfully modified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        '400':
+          description: Bad request, no filename provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    delete:
+      description: Delete the specified file
+      summary: Delete a file
+      operationId: deleteFile
+      parameters:
+      - name: filename
+        in: path
+        description: The file name
+        required: true
+        schema:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        style: simple
+      responses:
+        '200':
+          description: File successfully deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        '400':
+          description: Bad request, no filename provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /fs:
+    get:
+      description: Returns SPIFFS file system information
+      summary: Find SPIFFS informations
+      operationId: getFs
+      responses:
+        '200':
+          description: SPIFFS informations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/fsInfo'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /fs/format:
+    post:
+      description: Formats the file system (will take a long time)
+      summary: Format File System
+      operationId: formatFs
+      responses:
+        '202':
+          description: Command accepted, the file system is being formatted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /gpio/{gpio_id}:
+    get:
+      description: Returns the level (low/high) for gpio with the specified id
+      summary: Find gpio level
+      operationId: getGpioLevel
+      parameters:
+      - name: gpio_id
+        in: path
+        description: The gpio id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          description: WEMOX D1 D1-D8
+          minimum: 1      
+          maximum: 8      
+        style: simple
+      responses:
+        '200':
+          description: The current level for gpio "gpio_id"
+          content:
+            application/json: 
+              schema:
+                $ref: '#/components/schemas/gpioInfo'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets the specified gpio to the level in the request body (will work only on gpio configured as output)
+      summary: Set gpio level
+      operationId: setGpioLevel
+      parameters:
+      - name: gpio_id
+        in: path
+        description: The gpio id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          description: WEMOX D1 D1-D8
+          minimum: 1      
+          maximum: 8      
+        style: simple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/gpioInfo'
+      responses:
+        '200':
+          description: Successful, returns the current gpio level
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/gpioInfo'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /gpio/cfg/{gpio_id}:
+    get:
+      description: Returns the specified gpio config (unprovisioned or input or output)
+      summary: Find gpio config
+      operationId: getGpioCfg
+      parameters:
+      - name: gpio_id
+        in: path
+        description: The gpio id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          description: WEMOX D1 D1-D8
+          minimum: 1      
+          maximum: 8      
+        style: simple
+      responses:
+        '200':
+          description: The gpio config
+          content:
+            application/json: 
+              schema:
+                $ref: '#/components/schemas/gpioCfg'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets the specified gpio as unprovisioned or input or output
+      summary: Set gpio config
+      operationId: setGpioCfg
+      parameters:
+      - name: gpio_id
+        in: path
+        description: The gpio id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          description: WEMOX D1 D1-D8
+          minimum: 1      
+          maximum: 8      
+        style: simple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/gpioCfg'
+      responses:
+        '200':
+          description: Successful, returns the current gpio config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/gpioCfg'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /info:
+    get:
+      description: Returns informations about the device (device name, chip id, fw versions)
+      summary: Find device info
+      operationId: getInfo
+      responses:
+        '200':
+          description: The device information
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/deviceInfo'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /mdns:
+    get:
+      description: Returns mDNS status (enabled or disabled)
+      summary: Find mDNS status
+      operationId: getMdns
+      responses:
+        '200':
+          description: The mDNS status (enabled/disabled)
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/mdnsStatus'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets mDNS status (enabled or disabled)
+      summary: Enable/Disable mDNS
+      operationId: setMdns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mdnsStatus'
+      responses:
+        '200':
+          description: Successful, returns current mDNS status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mdnsStatus'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ota:
+    post:
+      description: Start OTA (in case that version check is enabled and the device binary is up-to-date OTA won't be started)
+      summary: Start OTA
+      operationId: startOTA
+      responses:
+        '200':
+          description: OTA completed or not required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ota/cfg:
+    get:
+      description: Returns the config used for OTA
+      summary: Find OTA config
+      operationId: getOtaCfg
+      responses:
+        '200':
+          description: The current OTA config
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/otaCfg'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets OTA config
+      summary: Set OTA config
+      operationId: setOtaCfg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/otaCfg'
+      responses:
+        '200':
+          description: Successful, return current OTA config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/otaCfg'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ota/reboot:
+    post:
+      description: Reboot the device after OTA completion
+      summary: Reboot after OTA
+      operationId: setOtaReboot
+      responses:
+        '202':
+          description: Successful, device is rebooting...
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /reboot:
+    post:
+      description: Reboots the device
+      summary: Reboot
+      operationId: setReboot
+      responses:
+        '202':
+          description: Successful, device is rebooting...
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /timedate:
+    get:
+      description: Returns the device current time and date
+      summary: Find time and date
+      operationId: getTimedate
+      responses:
+        '200':
+          description: The current time and date
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/timedateFull'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets the device timedate (will only work when SNTP is disabled)
+      summary: Set timedate
+      operationId: setTimedate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/timedate'
+      responses:
+        '200':
+          description: Successful message, returns the current timestamp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/timedate'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /timedate/cfg:
+    get:
+      description: Returns the device time and date config (SNTP enabled/disabled and timezone)
+      summary: Find timedate config
+      operationId: getTimedateCfg
+      responses:
+        '200':
+          description: The current timedate config
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/timedateCfg'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets timedate config (SNTP enabled/disabled and timezone)
+      summary: Set timedate config
+      operationId: setTimedateCfg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/timedateCfg'
+      responses:
+        '200':
+          description: Successful, returns current timedate config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/timedateCfg'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /wifi:
+    get:
+      description: Get wifi inforation (working mode, AP SSID and IP address)
+      summary: Get wifi info
+      operationId: getWifi
+      responses:
+        '200':
+          description: Successful message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/wifiInfo'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /wifi/cfg:
+    get:
+      description: Returns the wifi station config (SSID and password)
+      summary: Find wifi config
+      operationId: getWifiCfg
+      responses:
+        '200':
+          description: The current wifi config
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/wifiCfg'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets wifi station config and connects to the AP
+      summary: Set wifi station config
+      operationId: setWifiCfg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/wifiCfg'
+      responses:
+        '200':
+          description: Successful, returns current wifi config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/wifiCfg'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /wifi/scan:
+    get:
+      description: Gets the AP list as seen by the device in station mode
+      summary: Get AP list
+      operationId: getAPlist
+      responses:
+        '200':
+          description: The list of the APs retrieved by the device
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/wifiScanResult'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+# specific app APIs
+  /ctrl/advSettings:
+    get:
+      description: Returns temperature control advanced settings
+      summary: Find temperature advanced control settings
+      operationId: getCtrlAdvSettings
+      responses:
+        '200':
+          description: the temperature advanced control settings
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlAdvSettings'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets temperature control advanced settings
+      summary: Sets temperature control advanced settings
+      operationId: setCtrlAdvSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlAdvSettings'
+      responses:
+        '200':
+          description: Successful, return current temperature advanced control settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ctrl/log:
+    get:
+      description: Returns the last events recorded by the control device
+                   The event list includes
+                   + temperature changes
+                   + relative humidity changes
+                   + control mode changes
+                   + control set-point changes
+                   + heater (ON/OFF)
+      summary: Find control events log
+      operationId: getCtrlEvents
+      responses:
+        '200':
+          description: The last control events
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlLog'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ctrl/program:
+    get:
+      description: Returns the list of the programs on the device.
+      summary: Program list
+      operationId: getProgramList
+      responses:
+        '200':
+          description: The programs list
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlProgramList'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Create a new program
+      summary: Create a program
+      operationId: createProgram
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlProgram'
+      responses:
+        '200':
+          description: Program created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlProgram'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ctrl/program/{program_id}:
+    get:
+      description: Returns the details of the specified program
+      summary: Find program
+      operationId: getProgram
+      parameters:
+      - name: program_id
+        in: path
+        description: The program id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 49
+        style: simple
+      responses:
+        '200':
+          description: The program details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlProgram'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    put:
+      description: Update the details of the specified program
+      summary: Update a program
+      operationId: updateProgram
+      parameters:
+      - name: program_id
+        in: path
+        description: The program id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 49
+        style: simple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlProgram'
+      responses:
+        '200':
+          description: Program successfully modified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlProgram'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    delete:
+      description: Delete specified program
+      summary: Delete a program
+      operationId: deleteProgram
+      parameters:
+      - name: program_id
+        in: path
+        description: The program id
+        required: true
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 49
+        style: simple
+      responses:
+        '200':
+          description: Program successfully deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/success'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ctrl/remoteLog:
+    get:
+      description: Returns remote host (log host) settings
+      summary: Find remote host settings
+      operationId: getRemoteLog
+      responses:
+        '200':
+          description: the remote host settings
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlRemoteLog'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets remote host (log host) settings
+      summary: Sets remote host settings
+      operationId: setRemoteLog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlRemoteLog'
+      responses:
+        '200':
+          description: Successful, return current remote host settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlRemoteLog'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ctrl/settings:
+    get:
+      description: Returns temperature control settings
+      summary: Find temperature control settings
+      operationId: getCtrlSettings
+      responses:
+        '200':
+          description: the temperature control settings
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlSettings'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets temperature control settings
+      summary: Sets temperature control settings
+      operationId: setCtrlSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlSettings'
+      responses:
+        '200':
+          description: Successful, return current temperature control settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlSettings'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /ctrl/vars:
+    get:
+      description: Returns the current ctrl variables, including
+                   + timedate
+                   + timezone
+                   + temperature
+                   + relative humidity
+                   + control mode
+                   + control program
+                   + set-point
+                   + power off timer
+                   + timedate when power off timer started
+                   + heater status
+      summary: Find current control variables
+      operationId: getCtrlVars
+      responses:
+        '200':
+          description: The current control variables
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlVars'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+
+components:
+  schemas:
+    cron_status:
+      type: object
+      required:
+      - cron_enabled
+      properties:
+        cron_enabled:
+          type: integer
+          format: int32
+          description: enabled=1, disabled=0
+          default: 0
+          minimum: 0      
+          maximum: 1      
+      additionalProperties: false
+    ctrlAdvSettings:
+      type: object
+      required:
+      - kp
+      - kd
+      - ki
+      - u_max
+      - heater_on_min
+      - heater_on_max
+      - heater_on_off
+      - heater_cold
+      - warm_up_period
+      - wup_heater_on
+      - wup_heater_off
+      properties:
+        kp:
+          type: integer
+          format: int32
+          description: PID proportional coefficient
+          default: 1
+          minimum: -1000      
+          maximum: 1000  
+        kd:
+          type: integer
+          format: int32
+          description: PID derivative coefficient
+          default: -5
+          minimum: -1000      
+          maximum: 1000  
+        ki:
+          type: integer
+          format: int32
+          description: PID integral coefficient
+          default: 5
+          minimum: -1000      
+          maximum: 1000  
+        u_max:
+          type: integer
+          format: int32
+          description: max value for u(t) (for normalizing u) where u(t) = Kp * e(t) + Kd * (d e(t)/dt) + Ki * Integral(0,t)(e(x)dx)
+          default: 46
+          minimum: 1      
+          maximum: 1000      
+        heater_on_min:
+          type: integer
+          format: int32
+          description: the minimum time the heater can be on (minutes)
+          default: 2
+          minimum: 0      
+          maximum: 1000      
+        heater_on_max:
+          type: integer
+          format: int32
+          description: the maximum time the heater can be on (minutes)
+          default: 13
+          minimum: 0      
+          maximum: 1000
+        heater_on_off:
+          type: integer
+          format: int32
+          description: the heater on/off period length (minutes)
+          default: 15
+          minimum: 0      
+          maximum: 1000
+        heater_cold:
+          type: integer
+          format: int32
+          description: when the heater was off for 'heater_cold' period, then a warm-up period is started when it is switched on
+          default: 120
+          minimum: 0      
+          maximum: 1000    
+        warm_up_period:
+          type: integer
+          format: int32
+          description: the heater warm up period
+          default: 21
+          minimum: 0      
+          maximum: 1000      
+        wup_heater_on:
+          type: integer
+          format: int32
+          description: the time the heater will be on during the warm up period (during the warm up period the heater will be repeatedly switched on for 'wup_heater_on' and switched off for 'wup_heater_off')
+          default: 3
+          minimum: 0      
+          maximum: 1000   
+        wup_heater_off:
+          type: integer
+          format: int32
+          description: the time the heater will be off during the warm up period (during the warm up period the heater will be repeatedly switched on for 'wup_heater_on' and switched off for 'wup_heater_off')
+          default: 4
+          minimum: 0      
+          maximum: 1000
+      additionalProperties: false
+    ctrlLog:
+      type: object
+      required:
+      - ctrl_events
+      properties:
+        ctrl_events:
+          type: array
+          maxItems: 65535
+          items:
+            type: object
+            required:
+            - ts
+            - tp
+            - vl
+            properties:
+              ts:
+                type: integer
+                format: int32
+                description: timestamp
+                default: 0
+                minimum: 0
+                maximum: 4294967295
+              tp:
+                type: integer
+                format: int32
+                description: 1 - temp_change
+                             2 - heater_change
+                             2 - mode_change
+                             4 - setpoint_change
+                             5 - humi_change
+                default: 1
+                minimum: 1  
+                maximum: 5
+              vl:
+                type: integer
+                format: int32
+                description: an additional numerical value, depending on the event code
+                default: 0
+                minimum: 0    
+                maximum: 4294967295
+            additionalProperties: false
+      additionalProperties: false
+    ctrlProgram:
+      type: object
+      required:
+      - id
+      - name
+      - min_temp
+      - period_count
+      - periods
+      properties:
+        id:
+          type: integer
+          format: int32
+          description: program id
+          default: 0
+          minimum: 0
+          maximum: 19
+        name:
+          type: string
+          description: program description
+          pattern: '[ -~]{0,31}'
+          minLength: 0
+          maxLength: 31
+        min_temp:
+          type: integer
+          format: int32
+          description: the default temperature set-point * 10
+          default: 0
+          minimum: -1000
+          maximum: 1000
+        period_count:
+          type: integer
+          format: int32
+          description: the numer of periods defined by the program
+          default: 0
+          minimum: 0
+          maximum: 50
+        periods:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required:
+            - wd
+            - b
+            - e
+            - sp
+            properties:
+              wd:
+                type: integer
+                format: int32
+                description: the day of the week (1->Mon, 7->Sun, 8->Everyday)
+                default: 1
+                minimum: 1
+                maximum: 8
+              b:
+                type: integer
+                format: int32
+                description: period starting minute on a day range [0..1339]
+                default: 0
+                minimum: 0
+                maximum: 1339
+              e:
+                type: integer
+                format: int32
+                description: period ending minute on a day range [0..1339]
+                default: 1
+                minimum: 1
+                maximum: 1339
+              sp:
+                type: integer
+                format: int32
+                description: the temperature set-point * 10
+                default: 0
+                minimum: -1000
+                maximum: 1000
+            additionalProperties: false
+      additionalProperties: false
+    ctrlProgramList:
+      type: object
+      required:
+      - prg_count
+      - prg_headings
+      properties:
+        prg_count:
+          type: integer
+          format: int32
+          description: the program count
+          default: 0
+          minimum: 0      
+          maximum: 20
+        prg_headings:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required:
+            - id
+            - desc
+            properties:
+              id:
+                type: integer
+                format: int32
+                description: program id
+                default: 0
+                minimum: 0
+                maximum: 19
+              desc:
+                type: string
+                description: program description
+                pattern: '[ -~]{0,31}'
+                minLength: 0
+                maxLength: 31
+            additionalProperties: false
+      additionalProperties: false
+    ctrlRemoteLog:
+      type: object
+      required:
+      - enabled
+      - host
+      - port
+      - path
+      properties:
+        enabled:
+          type: integer
+          format: int32
+          description: says if the log to the remote host in enabled (1) or not (0)
+          default: 0
+          minimum: 0      
+          maximum: 1  
+        host:
+          type: string
+          pattern: '[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}'
+          minLength: 7
+          maxLength: 15
+        port:
+          type: integer
+          format: int32
+          default: 80
+          minimum: 1
+          maximum: 65535
+        path:
+          type: string
+          pattern: '/[ -~]{0,4095}'
+          minLength: 1
+          maxLength: 4096
+      additionalProperties: false
+    ctrlSettings:
+      type: object
+      required:
+      - ctrl_mode
+      - manual_pulse_on
+      - manual_pulse_off
+      - auto_setpoint
+      - program_id
+      - program_name
+      - power_off_timer
+      properties:
+        ctrl_mode:
+          type: integer
+          format: int32
+          description: the control working modes
+                       + OFF 0
+                       + MANUAL 1
+                       + AUTO 2
+                       + PROGRAM 3
+          default: 0
+          minimum: 0      
+          maximum: 3
+        manual_pulse_on:
+          type: integer
+          format: int32
+          description: in manual working mode the minutes the heater will be on
+          default: 0
+          minimum: 0      
+          maximum: 32767
+        manual_pulse_off:
+          type: integer
+          format: int32
+          description: in manual working mode the minutes the heater will be off
+          default: 0
+          minimum: 0     
+          maximum: 32767  
+        auto_setpoint:
+          type: integer
+          format: int32
+          description: in auto working mode the temperature set-point
+          default: 0
+          minimum: -1000   
+          maximum: 1000      
+        program_id:
+          type: integer
+          format: int32
+          description: in program working mode the id of the running program
+          default: 0
+          minimum: 0      
+          maximum: 9      
+        program_name:
+          type: string
+          description: program description
+          pattern: '[ -~]{0,31}'
+          minLength: 0
+          maxLength: 31
+        power_off_timer:
+          type: integer
+          format: int32
+          description: the value (minutes) of the power off timer
+          default: 0
+          minimum: 0      
+          maximum: 32767
+      additionalProperties: false
+    ctrlVars:
+      type: object
+      required:
+      - timestamp
+      - timezone
+      - current_temp
+      - current_humi
+      - heater_status
+      - auto_setpoint
+      - ctrl_mode
+      - program_name
+      - pwr_off_timer_started_on
+      - pwr_off_timer
+      properties:
+        timestamp:
+          type: integer
+          format: int32
+          description: timestamp
+          default: 0
+          minimum: 0
+          maximum: 4294967295
+        timezone:
+          type: integer
+          format: int32
+          description: timezone
+          default: 0
+          minimum: -14
+          maximum: 14
+        current_temp:
+          type: integer
+          format: int32
+          description: current temperature reading * 10.0
+          default: 0
+          minimum: -1000   
+          maximum: 1000      
+        current_humi:
+          type: integer
+          format: int32
+          description: current relative humidity reading * 10.0
+          default: 0
+          minimum: 0    
+          maximum: 1000      
+        heater_status:
+          type: integer
+          format: int32
+          description: current heater status (on->1/off->0)
+          default: 0
+          minimum: 0    
+          maximum: 1
+        auto_setpoint:
+          type: integer
+          format: int32
+          description: the temperature control set-point
+          default: 0
+          minimum: -1000   
+          maximum: 1000      
+        ctrl_mode:
+          type: integer
+          format: int32
+          description: the control working mode
+          default: 0
+          minimum: 0      
+          maximum: 3
+        program_name:
+          type: integer
+          format: int32
+          description: the name of the running program
+          default: 0
+          minimum: 0      
+          maximum: 9      
+        pwr_off_timer_started_on:
+          type: integer
+          format: int32
+          description: timestamp
+          default: 0
+          minimum: 0
+          maximum: 4294967295
+        pwr_off_timer:
+          type: integer
+          format: int32
+          description: the value (minutes) of the power off timer
+          default: 0
+          minimum: 0      
+          maximum: 32767
+      additionalProperties: false
+    deviceInfo:
+      type: object
+      required:
+      - device_name
+      - chip_id
+      - app_name
+      - app_version
+      - espbot_version
+      - api_version
+      - library_version
+      - sdk_version
+      - boot_version
+      properties:
+        device_name:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        chip_id:
+          type: string
+          pattern: '[0-9]{1,10}'
+          minLength: 1
+          maxLength: 10
+        app_name:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        app_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        espbot_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        api_version:
+          type: string
+          pattern: '[ -~]{1,10}'
+          minLength: 1
+          maxLength: 10
+        library_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        sdk_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        boot_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+      additionalProperties: false
+    deviceName:
+      type: object
+      required:
+      - device_name
+      properties:
+        device_name:
+          type: string
+          description: the device name
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+      additionalProperties: false
+    diagnosticEvents:
+      type: object
+      required:
+      - diag_events
+      properties:
+        diag_events:
+          type: array
+          maxItems: 65535
+          items:
+            type: object
+            required:
+            - ts
+            - ack
+            - type
+            - code
+            - val
+            properties:
+              ts:
+                type: integer
+                format: int32
+                description: timestamp
+                default: 0
+                minimum: 0
+                maximum: 4294967295
+              ack:
+                type: integer
+                format: int32
+                description: 0 -> the event wasn't acknowledge yet, 1 -> the event was acknowledged
+                default: 0
+                minimum: 0    
+                maximum: 1
+              type:
+                type: string
+                description: the event type (hex format) (FATAL, ERROR, WARNING, INFO, DEBUG, TRACE, ALL) 
+                pattern: '(0x|0X)?[0-9a-zA-Z]{1,4}'
+                minLength: 1
+                maxLength: 4
+              code:
+                type: string
+                description: the event numerical code (hex format)
+                pattern: '(0x|0X)?[0-9a-zA-Z]{1,6}'
+                minLength: 1
+                maxLength: 6
+              val:
+                type: integer
+                format: int32
+                description: an additional numerical value, depending on the event code
+                default: 0
+                minimum: 0    
+                maximum: 4294967295
+            additionalProperties: false
+      additionalProperties: false
+    diagnosticCfg:
+      type: object
+      required:
+      - diag_led_mask
+      - serial_log_mask
+      - uart_0_bitrate
+      - sdk_print_enabled
+      properties:
+        diag_led_mask:
+          type: integer
+          format: int32
+          description: bitmask 0??? ????
+                       .        ||| ||||_ 1 -> show FATAL events on led
+                       .        ||| |||__ 1 -> show ERROR events on led
+                       .        ||| ||___ 1 -> show WARNING events on led
+                       .        ||| |____ 1 -> show INFO events on led
+                       .        |||______ 1 -> show DEBUG events on led
+                       .        ||_______ 1 -> show TRACE events on led
+                       .        |________ 1 -> show ALL events on led
+          default: 3
+          minimum: 0
+          maximum: 127
+        serial_log_mask:
+          type: integer
+          format: int32
+          description: bitmask 0??? ????
+                       .        ||| ||||_ 1 -> show FATAL events on serial log
+                       .        ||| |||__ 1 -> show ERROR events on serial log
+                       .        ||| ||___ 1 -> show WARNING events on serial log
+                       .        ||| |____ 1 -> show INFO events on serial log
+                       .        |||______ 1 -> show DEBUG events on serial log
+                       .        ||_______ 1 -> show TRACE events on serial log
+                       .        |________ 1 -> show ALL events on serial log
+          default: 0
+          minimum: 0
+          maximum: 127
+        uart_0_bitrate:
+          type: integer
+          format: int32
+          description: The UART 0 bitrate
+          default: 74880
+          minimum: 300
+          maximum: 3686400
+        sdk_print_enabled:
+          type: integer
+          format: int32
+          description: If printing to UART 0 is enabled (1) or not (0)
+          default: 1
+          minimum: 0
+          maximum: 1
+      additionalProperties: false
+    error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - reason
+          properties:
+            code:
+              type: integer
+              format: int32
+              default: 500
+              minimum: 400      
+              maximum: 511    
+              description: http error code
+            message:
+              type: string
+              description: the standard http error message
+              pattern: '[ -~]{1,128}'
+              minLength: 0
+              maxLength: 128
+            reason:
+              type: string
+              description: a short message describing what went wrong
+              pattern: '.{0,128}'
+              minLength: 0
+              maxLength: 128
+          additionalProperties: false
+      additionalProperties: false
+    fsInfo:
+      type: object
+      required:
+      - file_system_size
+      - file_system_used_size
+      properties:
+        file_system_size:
+          type: integer
+          format: int32
+          description: the file system size (bytes)
+          default: 1897811
+          minimum: 0    
+          maximum: 4194304
+        file_system_used_size:
+          type: integer
+          format: int32
+          description: the amount (bytes) of file system that is being used
+          default: 0
+          minimum: 0    
+          maximum: 4194304
+      additionalProperties: false
+    fileList:
+      type: object
+      required:
+      - files
+      properties:
+        files:
+          type: array
+          maxItems: 65535
+          items:
+            type: object
+            required:
+            - name
+            - size
+            properties:
+              name:
+                type: string
+                pattern: '[ -~]{1,31}'
+                minLength: 1
+                maxLength: 31
+              size:
+                type: integer
+                format: int32
+                default: 0
+                minimum: 0    
+                maximum: 4194304
+            additionalProperties: false
+      additionalProperties: false
+    gpioCfg:
+      type: object
+      required:
+      - gpio_type
+      properties:
+        gpio_id:
+          type: integer
+          format: int32
+          description: WEMOX D1 D1-D8
+          default: 1
+          minimum: 1      
+          maximum: 8      
+        gpio_type:
+          type: string
+          pattern: 'unprovisioned|input|output'
+          minLength: 5
+          maxLength: 13
+      additionalProperties: false
+    gpioInfo:
+      type: object
+      required:
+      - gpio_level
+      properties:
+        gpio_id:
+          type: integer
+          format: int32
+          description: WEMOX D1 D1-D8
+          default: 1
+          minimum: 1      
+          maximum: 8      
+        gpio_level:
+          type: string
+          pattern: 'unprovisioned|high|low'
+          minLength: 3
+          maxLength: 13
+      additionalProperties: false
+    lastReset:
+      type: object
+      required:
+      - date
+      - reason
+      - exccause
+      - epc1
+      - epc2
+      - epc3
+      - evcvaddr
+      - depc
+      - sp
+      - spDump
+      properties:
+        date:
+          type: string
+          description: the timestamp when last reboot occurred
+          pattern: "[A-Za-z]{3} [A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}:[0-9]{2} [0-9]{4}"
+          minLength: 23
+          maxLength: 24
+        reason:
+          type: string
+          description: the reason for last reboot
+          pattern: "[0-6]"
+          minLength: 1
+          maxLength: 1
+        exccause:
+          type: string
+          description: exception type
+          pattern: '[0-9a-fA-F]{1,2}'
+          minLength: 1
+          maxLength: 2
+        epc1:
+          type: string
+          description: program counter
+          pattern: '[0-9a-fA-F]{1,8}'
+          minLength: 1
+          maxLength: 8
+        epc2:
+          type: string
+          pattern: '[0-9a-fA-F]{1,8}'
+          minLength: 1
+          maxLength: 8
+        epc3:
+          type: string
+          pattern: '[0-9a-fA-F]{1,8}'
+          minLength: 1
+          maxLength: 8
+        evcvaddr:
+          type: string
+          description: exception address
+          pattern: '[0-9a-fA-F]{1,8}'
+          minLength: 1
+          maxLength: 8
+        depc:
+          type: string
+          pattern: '[0-9a-fA-F]{1,8}'
+          minLength: 1
+          maxLength: 8
+        sp:
+          type: string
+          description: stack pointer
+          pattern: '[0-9a-fA-F]{1,8}'
+          minLength: 1
+          maxLength: 8
+        spDump:
+          type: array
+          description: stack dump, only addresses that possibly are
+                       return addresses are reported
+          minItems: 19
+          maxItems: 19
+          items:
+            type: string
+            description: address
+            pattern: '[0-9a-fA-F]{1,8}'
+            minLength: 1
+            maxLength: 8
+      additionalProperties: false
+    mdnsStatus:
+      type: object
+      required:
+      - mdns_enabled
+      properties:
+        mdns_enabled:
+          type: integer
+          format: int32
+          description: enabled=1, disabled=0
+          default: 0
+          minimum: 0      
+          maximum: 1      
+      additionalProperties: false
+    memInterval:
+      type: object
+      required:
+      - address
+      - length
+      properties:
+        address:
+          type: string
+          description: the memory interval starting address
+          pattern: '(0x|0X)?[0-9a-fA-F]{8}'
+          minLength: 8
+          maxLength: 10
+        length:
+          type: integer
+          format: int32
+          description: the memory interval length
+          default: 4
+          minimum: 4    
+          maximum: 1024
+      additionalProperties: false
+    memIntervalContent:
+      type: object
+      required:
+      - address
+      - length
+      - content
+      properties:
+        address:
+          type: string
+          description: the memory interval starting address
+          pattern: '(0x|0X)?[0-9a-fA-F]{8}'
+          minLength: 8
+          maxLength: 10
+        length:
+          type: integer
+          format: int32
+          description: the memory interval length
+          default: 4
+          minimum: 4    
+          maximum: 1024
+        content:
+          type: string
+          description: the memory interval content (example 'string')
+          pattern: '[\x00-\x7F]{4,1024}'
+          minLength: 0
+          maxLength: 1024
+      additionalProperties: false
+    memIntervalHexContent:
+      type: object
+      required:
+      - address
+      - length
+      - content
+      properties:
+        address:
+          type: string
+          description: the memory interval starting address
+          pattern: '(0x|0X)?[0-9a-fA-F]{8}'
+          minLength: 8
+          maxLength: 10
+        length:
+          type: integer
+          format: int32
+          description: the memory interval length
+          default: 4
+          minimum: 4    
+          maximum: 1024
+        content:
+          type: string
+          description: the memory interval content (example ' 0 A0 33 3F')
+          pattern: '( [0-9a-fA-F][0-9a-fA-F])+'
+          minLength: 0
+          maxLength: 1024
+      additionalProperties: false
+    memInfo:
+      type: object
+      required:
+      - stack_max_addr
+      - stack_min_addr
+      - heap_start_addr
+      - heap_free_size
+      - heap_max_size
+      - heap_min_size
+      - heap_objs
+      - heap_max_objs
+      properties:
+        stack_max_addr:
+          type: string
+          description: the highest (estimated) memory address reached by the stack
+          pattern: '(0x|0X)?[0-9a-fA-F]{8,10}'
+          minLength: 8
+          maxLength: 10
+        stack_min_addr:
+          type: string
+          description: the lowest (estimated) memory address reached by the stack
+          pattern: '(0x|0X)?[0-9a-fA-F]{8,10}'
+          minLength: 8
+          maxLength: 10
+        heap_start_addr:
+          type: string
+          description: the starting heap memory address (SDK excluded)
+          pattern: '(0x|0X)?[0-9a-fA-F]{8,10}'
+          minLength: 8
+          maxLength: 10
+        heap_free_size:
+          type: integer
+          format: int32
+          description: the size of currently free heap memory
+          default: 42000
+          minimum: 0
+          maximum: 65536
+        heap_max_size:
+          type: integer
+          format: int32
+          description: the maximum size of free heap memory
+          default: 42000
+          minimum: 0
+          maximum: 65536
+        heap_min_size:
+          type: integer
+          format: int32
+          description: the minimum size of free heap memory
+          default: 42000
+          minimum: 0
+          maximum: 65536
+        heap_objs:
+          type: integer
+          format: int32
+          description: the amount of objects currently allocated to the heap memory
+          default: 26
+          minimum: 0
+          maximum: 65536
+        heap_max_objs:
+          type: integer
+          format: int32
+          description: the maximum number of objects allocated to the heap memory
+          default: 30
+          minimum: 0
+          maximum: 65536
+      additionalProperties: false
+    otaCfg:
+      type: object
+      required:
+      - host
+      - port
+      - path
+      - check_version
+      - reboot_on_completion
+      properties:
+        host:
+          type: string
+          pattern: '[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}'
+          minLength: 7
+          maxLength: 15
+        port:
+          type: integer
+          format: int32
+          default: 80
+          minimum: 1
+          maximum: 65535
+        path:
+          type: string
+          pattern: '/[ -~]{0,4095}'
+          minLength: 1
+          maxLength: 4096
+        check_version:
+          type: integer
+          format: int32
+          description: 0 -> don't check the binary version, 1- check the binary version
+          default: 0
+          minimum: 0
+          maximum: 1
+        reboot_on_completion:
+          type: integer
+          format: int32
+          description: 0 -> don't reboot on completion, 1 -> reboot on completion
+          default: 1
+          minimum: 0
+          maximum: 1
+      additionalProperties: false
+    success:
+      type: object
+      required:
+      - msg
+      properties:
+        msg:
+          type: string
+          description: a short message describing what was accomplished
+          pattern: '.{0,128}'
+          minLength: 0
+          maxLength: 128
+      additionalProperties: false
+    timedate:
+      type: object
+      required:
+      - timestamp
+      properties:
+        timestamp:
+          type: integer
+          format: int32
+          description: timestamp
+          default: 0
+          minimum: 0
+          maximum: 4294967295
+      additionalProperties: false
+    timedateFull:
+      type: object
+      required:
+      - timestamp
+      - date
+      - sntp_enabled
+      - timezone
+      properties:
+        timestamp:
+          type: integer
+          format: int32
+          description: timestamp
+          default: 0
+          minimum: 0
+          maximum: 4294967295
+        date:
+          type: string
+          description: the timestamp when last reboot occurred
+          pattern: '[A-Za-z]{3} [A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}:[0-9]{2} [0-9]{4}'
+          minLength: 23
+          maxLength: 24
+        sntp_enabled:
+          type: integer
+          format: int32
+          description: 0 -> disabled, 1 -> enabled
+          default: 0
+          minimum: 0
+          maximum: 1
+        timezone:
+          type: integer
+          format: int32
+          description: timezone
+          default: 0
+          minimum: -14
+          maximum: 14
+      additionalProperties: false
+    timedateCfg:
+      type: object
+      required:
+      - sntp_enabled
+      - timezone
+      properties:
+        sntp_enabled:
+          type: integer
+          format: int32
+          description: 0 -> disabled, 1 -> enabled
+          default: 0
+          minimum: 0
+          maximum: 1
+        timezone:
+          type: integer
+          format: int32
+          description: timezone
+          default: 0
+          minimum: -14
+          maximum: 14
+      additionalProperties: false
+    wifiCfg:
+      type: object
+      required:
+      - station_ssid
+      - station_pwd
+      properties:
+        station_ssid:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        station_pwd:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 63
+      additionalProperties: false
+    wifiInfo:
+      type: object
+      required:
+      - op_mode
+      - ip_address
+      properties:
+        op_mode:
+          type: string
+          pattern: 'STATION|AP'
+          description: STATION or AP
+          minLength: 2
+          maxLength: 7
+        SSID:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        ip_address:
+          type: string
+          pattern: '[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}'
+          minLength: 7
+          maxLength: 15
+      additionalProperties: false
+    wifiScanResult:
+      type: object
+      required:
+      - AP_count
+      - AP_SSIDs
+      properties:
+        AP_count:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0    
+          maximum: 65535
+        AP_SSIDs:
+          type: array
+          maxItems: 65535
+          items:
+            type: string
+            pattern: '[ -~]{1,31}'
+            minLength: 1
+            maxLength: 31
+      additionalProperties: false

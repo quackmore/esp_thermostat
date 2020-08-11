@@ -190,6 +190,7 @@ BINODIR := $(ODIR)/$(TARGET)/$(FLAVOR)/bin
 OBINS := $(GEN_BINS:%=$(BINODIR)/%)
 
 GIT_VERSION := $(shell git --no-pager describe --tags --always --dirty)
+API_VERSION := $(shell grep "  version:" $(TOP_DIR)/api/thermostat_api.yaml | sed s/\ \ version:\ //)
 
 #
 # Note: 
@@ -215,6 +216,7 @@ CCFLAGS += 			                       \
 	-Wno-write-strings                     \
 	-DESPBOT=1                             \
 	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
+	-DAPI_RELEASE=\"$(API_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 
@@ -236,6 +238,7 @@ CCPPFLAGS += 			                   \
 	-Wno-write-strings                     \
 	-DESPBOT=1                             \
 	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
+	-DAPI_RELEASE=\"$(API_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 
@@ -296,6 +299,7 @@ endif
 	@echo ""
 	@echo "!!!"
 	@echo "VERSION: "$(GIT_VERSION)
+	@echo "API VERSION: "$(API_VERSION)
 	
 ifeq ($(app), 0)
 	@python $(SDK_DIR)/tools/gen_appbin.py $< 0 $(mode) $(freqdiv) $(size_map) $(app)

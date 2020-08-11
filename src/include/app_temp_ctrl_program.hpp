@@ -24,10 +24,10 @@ enum week_days
 struct prgm_headings
 {
     int id;
-    char desc[33];
+    char desc[32];
 };
 
-#define MAX_PROGRAM_COUNT 10
+#define MAX_PROGRAM_COUNT 20
 
 extern List<struct prgm_headings> *program_lst;
 
@@ -36,8 +36,8 @@ void init_program_list(void);
 struct prgm_period
 {
     enum week_days day_of_week;
-    int mm_start; // period starting minute on a day period [0..1440]
-    int mm_end;   // period ending minute on a day period [0..1440]
+    int mm_start; // period starting minute on a day range [0..1339]
+    int mm_end;   // period ending minute on a day range [0..1339]
     int setpoint;
 };
 

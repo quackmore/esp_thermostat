@@ -19,6 +19,7 @@ class Mdns
 {
 private:
   bool _enabled;
+  bool _running;
   struct mdns_info _info;
 
   int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR

@@ -29,7 +29,8 @@ extern "C"
 
 #define EVNT_QUEUE_SIZE 100 // 100 * sizeof(strut dia_event) => 1200 bytes
 
-#define DIA_LED ESPBOT_D4
+#define DIA_LED ESPBOT_D4 // D4 will be configured as output and will be in use by espbot
+                          // unless _diag_led_mask is set to 0
 
 struct dia_event
 {
@@ -44,6 +45,8 @@ class Espbot_diag
 {
 private:
   struct dia_event _evnt_queue[EVNT_QUEUE_SIZE];
+  uint32 _uart_0_bitrate;
+  bool _sdk_print_enabled;
   int _event_count;
   char _last_event;
   char _diag_led_mask; // bitmask 00?? ????
@@ -53,22 +56,30 @@ private:
                        //           || |____ 1 -> show INFO events on led
                        //           ||______ 1 -> show DEBUG events on led
                        //           |_______ 1 -> show TRACE events on led
-                       // setting _diag_led_mask will avoid any led control
+                       // set _diag_led_mask to 0 will avoid espbot using any led
   void add_event(char type, int code, uint32 value);
 
-  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
+  int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR
   int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
-                                  // return CFG_REQUIRES_UPDATE when cfg require update
-                                  // return CFG_ERROR otherwise
+                                   // return CFG_REQUIRES_UPDATE when cfg require update
+                                   // return CFG_ERROR otherwise
 
 public:
   Espbot_diag(){};
   ~Espbot_diag(){};
 
   // easy access
-  char _serial_log_mask;
+  char _serial_log_mask; // bitmask 0??? ????
+                         //          ||| ||||_ 1 -> show FATAL events on UART_0
+                         //          ||| |||__ 1 -> show ERROR events on UART_0
+                         //          ||| ||___ 1 -> show WARNING events on UART_0
+                         //          ||| |____ 1 -> show INFO events on UART_0
+                         //          |||______ 1 -> show DEBUG events on UART_0
+                         //          ||_______ 1 -> show TRACE events on UART_0
+                         //          |________ 1 -> show ALL events on UART_0
 
-  void init(void);
+  void init_essential(void);
+  void init_custom(void);
 
   void fatal(int code, uint32 value = 0); // calling one of these functions
   void error(int code, uint32 value = 0); // will add a new event to the event queue
@@ -87,6 +98,10 @@ public:
   void set_led_mask(char);                  //
   char get_serial_log_mask(void);
   void set_serial_log_mask(char);
+  uint32 get_uart_0_bitrate(void);
+  bool set_uart_0_bitrate(uint32); // return false when input is a wrong bitrate
+  bool get_sdk_print_enabled(void);
+  void set_sdk_print_enabled(bool);
   int save_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
 };
 

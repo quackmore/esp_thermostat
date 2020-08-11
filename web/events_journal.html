@@ -5,7 +5,7 @@
 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <link rel="shortcut icon" type="image/png" href="https://img.icons8.com/ios/50/000000/thermometer-automation.png" />
+  <link rel="shortcut icon" type="image/png" href="https://img.icons8.com/ios/50/000000/thermometer-automation.png"/>
   <meta name="description" content="">
   <meta name="author" content="">
   <title>ESP Thermostat</title>
@@ -16,7 +16,6 @@
     integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
     integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.17.0/dist/bootstrap-table.min.css">
 
   <!-- Custom styles for this template -->
   <link href="sidebar.css" rel="stylesheet">
@@ -46,40 +45,44 @@
     <div id="page-content-wrapper">
 
       <nav class="navbar navbar-expand-lg navbar-dark border-bottom" id=content-navbar>
-        <span id="content-title">Current Status</span>
+        <span id="content-title">Events Journal</span>
         <button class="btn ml-auto" id="menu-toggle">
           <span class="navbar-toggler-icon"></span>
         </button>
       </nav>
 
       <div class="container-fluid">
-        <div class="card-columns mt-3">
-          <div class="card border-info">
-            <div class="card-body">
-              <h4 id="sm_time" class="text-center">--- --:--</h4>
-              <h1 id="sm_temp" class="text-center">--.--</h1>
-              <h2 id="sm_humi" class="text-center">--.-%</h2>
+        <div>
+          <p></p>
+        </div>
+        <div class="card border-info">
+          <div class="card-body">
+            <div class="card-title">
+              <div class="row no-gutters">
+                <h5 class="card-title my-auto"><i class="fa fa-list"></i> Device Events</h5>
+              </div>
             </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <h4 id="sm_ctrl_mode" class="text-center">OFF</h4>
-              <h4 id="sm_ctrl_program" class="text-center d-none">---</h4>
-              <h4 id="sm_ctrl_sp" class="text-center d-none">---</h4>
-              <h4 id="sm_heater_status" class="text-center">heater OFF</h4>
+            <div class="table-responsive text-nowrap table-sm small table-bordered vh-50">
+              <table class="table table-striped" id="events_table">
+              </table>
             </div>
-          </div>
-          <div id="sm_pwr_off" class="card border-info d-none">
-            <div class="card-body">
-              <h4 class="text-center">Powering OFF in</h4>
-              <h1 id="sm_ctrl_pwr_off" class="text-center">---</h1>
-              <h4 class="text-center">minutes</h4>
+            <div>
+              <p></p>
+            </div>
+            <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups" id="events_buttons">
+              <div class="btn-group mr-2" role="group" aria-label="First group">
+                <button type="button" class="btn btn-primary" id="events_refresh">Refresh</button>
+              </div>
+              <div class="btn-group mr-2" role="group" aria-label="Second group">
+                <button type="button" class="btn btn-primary" id="events_ack">Acknowledge</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     <!-- End Of Page Content #########################################################################-->
+
   </div>
   <!-- /#wrapper -->
   <!-- #spinner while awaiting for page load -->
@@ -102,12 +105,12 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
     integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
     crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/bootstrap-table@1.17.0/dist/bootstrap-table.min.js"></script>
-  <script src="shared.js"></script>
-  <script src="home.js"></script>
   <script type="text/javascript">
     $('#awaiting').modal('show');
   </script>
+  <script src="shared.js"></script>
+  <script src="events_journal.js"></script>
+  <script src="event_codes.js"></script>
   <!-- Menu Toggle Script -->
   <script>
     $("#menu-toggle").click(function (e) {

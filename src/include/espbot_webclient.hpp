@@ -42,23 +42,23 @@ typedef enum
 class Webclnt
 {
 private:
-  struct espconn m_esp_conn;
-  int m_comm_timeout;
-  esp_tcp m_esptcp;
-  struct ip_addr m_host;
-  uint32 m_port;
-  Webclnt_status_type m_status;
+  struct espconn _esp_conn;
+  esp_tcp _esptcp;
+  struct ip_addr _host;
+  uint32 _port;
+  Webclnt_status_type _status;
 
-  void (*m_completed_func)(void *);
-  void *m_param;
+  void (*_completed_func)(void *);
+  void *_param;
   void format_request(char *);
 
 public:
   Webclnt();
   ~Webclnt();
 
-  os_timer_t m_connect_timeout_timer;
-  os_timer_t m_send_req_timeout_timer;
+  os_timer_t _connect_timeout_timer;
+  os_timer_t _send_req_timeout_timer;
+  uint32 _comm_timeout;
 
   char *request;
   int req_len;

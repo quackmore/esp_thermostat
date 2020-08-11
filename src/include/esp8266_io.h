@@ -91,16 +91,22 @@ int gpio_FUNC(int);
 // 
 
 // 
-// behaviour at boot for digital outputs
+// behaviour at boot
 //
-// D1 -> LOW                    -> espbot will set LOW when configured as output
-// D2 -> LOW                    -> espbot will set LOW when configured as output
-// D3 -> LOW  ?? to be verified -> espbot will set LOW when configured as output
-// D4 -> HIGH ?? to be verified -> espbot will set HIGH when configured as output (connected to led on board)
-// D5 -> HIGH                   -> espbot will set HIGH when configured as output
-// D6 -> HIGH                   -> espbot will set HIGH when configured as output
-// D7 -> HIGH                   -> espbot will set HIGH when configured as output
-// D8 -> LOW                    -> espbot will set LOW when configured as output
+// D1 -> LOW                    
+// D2 -> LOW                    
+// D3 -> pulse LOW at boot 
+// D4 -> pulse LOW at boot then HIGH  (connected to led on board)
+// D5 -> HIGH                   
+// D6 -> HIGH                   
+// D7 -> HIGH                   
+// D8 -> LOW                    
 //
+// when using D3, D4 and D8 as output please consider that theit status determine the boot options
+// 
+// (D3 GPIO0)  (D4 GPIO2)  (D8 GPIO15)
+//    High        High         Low     ->  boot from flash
+//    Low         High         Low     ->  program mode
+//  whichever   whichever      High    ->  boot from SD card
 
 #endif

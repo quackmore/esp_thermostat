@@ -18,6 +18,8 @@ extern "C"
 
 #define WIFI_CONNECT_TIMEOUT 15000      // max allowed time for connecting to an AP
 #define WIFI_WAIT_BEFORE_RECONNECT 3000 //
+#define GOT_IP_AFTER_CONNECTION ((os_param_t) 1)
+#define GOT_IP_ALREADY_CONNECTED ((os_param_t) 2)
 
 struct fast_scan
 {

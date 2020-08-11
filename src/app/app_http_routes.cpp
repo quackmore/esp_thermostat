@@ -31,55 +31,62 @@ extern "C"
 #include "app_event_codes.h"
 #include "app_heater.hpp"
 #include "app_http_routes.hpp"
+#include "app_remote_log.hpp"
 #include "app_temp_control.hpp"
 #include "app_temp_ctrl_program.hpp"
 #include "app_temp_log.hpp"
 
 static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","api_version":"","library_version":"","sdk_version":"","boot_version":""}
     ALL("get_api_info");
-    int str_len = os_strlen(app_name) +
-                  os_strlen(app_release) +
+    int str_len = 155 +
                   os_strlen(espbot.get_name()) +
-                  os_strlen(espbot.get_version()) +
-                  os_strlen(library_release) +
                   10 +
+                  os_strlen(app_name) +
+                  os_strlen(app_release) +
+                  os_strlen(espbot.get_version()) +
+                  os_strlen(f_str(API_RELEASE)) +
+                  os_strlen(library_release) +
                   os_strlen(system_get_sdk_version()) +
-                  10;
-    Heap_chunk msg(155 + str_len, dont_free);
-    if (msg.ref)
+                  10 +
+                  1;
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
     {
-        fs_sprintf(msg.ref,
-                   "{\"app_name\":\"%s\",\"app_version\":\"%s\",\"espbot_name\":\"%s\",",
-                   app_name,
-                   app_release,
-                   espbot.get_name());
-        fs_sprintf((msg.ref + os_strlen(msg.ref)),
-                   "\"espbot_version\":\"%s\",\"library_version\":\"%s\",\"chip_id\":\"%d\",",
-                   espbot.get_version(),
-                   library_release,
-                   system_get_chip_id());
-        fs_sprintf(msg.ref + os_strlen(msg.ref),
-                   "\"sdk_version\":\"%s\",\"boot_version\":\"%d\"}",
-                   system_get_sdk_version(),
-                   system_get_boot_version());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-        // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        esp_diag.error(APP_GET_API_INFO_HEAP_EXHAUSTED, str_len);
+        ERROR("get_api_info heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+        return;
     }
-    else
-    {
-        esp_diag.error(APP_GET_API_INFO_HEAP_EXHAUSTED, 155 + str_len);
-        ERROR("get_api_info heap exhausted %d", 155 + str_len);
-    }
+    fs_sprintf(msg.ref,
+               "{\"device_name\":\"%s\",\"chip_id\":\"%d\",\"app_name\":\"%s\",",
+               espbot.get_name(),
+               system_get_chip_id(),
+               app_name);
+    fs_sprintf((msg.ref + os_strlen(msg.ref)),
+               "\"app_version\":\"%s\",\"espbot_version\":\"%s\",",
+               app_release,
+               espbot.get_version());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"api_version\":\"%s\",\"library_version\":\"%s\",",
+               f_str(API_RELEASE),
+               library_release);
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"sdk_version\":\"%s\",\"boot_version\":\"%d\"}",
+               system_get_sdk_version(),
+               system_get_boot_version());
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getCtrlVars(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_temp_ctrl_vars");
+    ALL("getCtrlVars");
     // {
-    //   "ctrl_date": uint32,                 11 digits
+    //   "timestamp": uint32,                 11 digits
     //   "timezone": int                       3 digits
     //   "current_temp": int,                  5 digits
+    //   "current_humi": int,                  5 digits
     //   "heater_status": int,                 1 digit
     //   "auto_setpoint": int,                 4 digits
     //   "ctrl_mode": int,                     1 digit
@@ -87,32 +94,35 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
     //   "pwr_off_timer_started_on": uint32,  11 digits
     //   "pwr_off_timer": int                  4 digits
     // }
-    int str_len = 152 + 11 + 3 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1;
+    int str_len = 152 + 11 + 3 + 5 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_TEMP_CTRL_VARS_HEAP_EXHAUSTED, str_len);
-        ERROR("get_api_temp_ctrl_vars heap exhausted %d", str_len);
+        esp_diag.error(APP_GETCTRLVARS_HEAP_EXHAUSTED, str_len);
+        ERROR("getCtrlVars heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
     struct date *current_time = get_current_time();
-    // {"ctrl_date":,"timezone":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":}
+    // {"timestamp":,"timezone":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":}
     fs_sprintf(msg.ref,
-               "{\"ctrl_date\":%d,"
+               "{\"timestamp\":%d,"
                "\"timezone\":%d,",
                (current_time->timestamp), // sending UTC time
                esp_time.get_timezone());
     fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"current_temp\":%d,"
-               "\"heater_status\":%d,",
+               "\"current_humi\":%d,",
                get_temp(0),
-               (is_heater_on() ? 1 : 0));
+               get_humi(0));
     fs_sprintf(msg.ref + os_strlen(msg.ref),
-               "\"auto_setpoint\":%d,"
+               "\"heater_status\":%d,"
+               "\"auto_setpoint\":%d,",
+               (is_heater_on() ? 1 : 0),
+               get_auto_setpoint());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"ctrl_mode\":%d,"
                "\"program_name\":\"%s\",",
-               get_auto_setpoint(),
                get_current_mode(),
                get_cur_program_name(get_program_id()));
     fs_sprintf(msg.ref + os_strlen(msg.ref),
@@ -123,9 +133,9 @@ static void get_api_temp_ctrl_vars(struct espconn *ptr_espconn, Http_parsed_req 
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void get_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getCtrlSettings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_temp_ctrl_settings");
+    ALL("getCtrlSettings");
     //  {"ctrl_mode": ,"manual_pulse_on": ,"manual_pulse_off": ,"auto_setpoint": ,"program_id": ,"program_name": "","pwr_off_timer": }
 
     //  {
@@ -134,15 +144,15 @@ static void get_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed_
     //    manual_pulse_off: int,  4 digits
     //    auto_setpoint: int,     4 digits
     //    program_id: int,        2 digits
-    //    program_name: int,     32 digits
+    //    program_name: string,  32 digits
     //    pwr_off_timer: int      4 digits
     //  }
     int str_len = 126 + 1 + 4 + 4 + 4 + 2 + 32 + 4 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, str_len);
-        ERROR("get_api_temp_ctrl_settings heap exhausted %d", str_len);
+        esp_diag.error(APP_GETCTRLSETTINGS_HEAP_EXHAUSTED, str_len);
+        ERROR("getCtrlSettings heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
@@ -166,9 +176,9 @@ static void get_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed_
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void setCtrlSettings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("post_api_temp_ctrl_settings");
+    ALL("setCtrlSettings");
     //  {
     //    ctrl_mode: int,         1 digits
     //    manual_pulse_on: int,   4 digits
@@ -199,8 +209,8 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk str_ctrl_mode(settings.get_cur_pair_value_len());
     if (str_ctrl_mode.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETCTRLSETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setCtrlSettings heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -222,8 +232,8 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk str_manual_pulse_on(settings.get_cur_pair_value_len());
     if (str_manual_pulse_on.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETCTRLSETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setCtrlSettings heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -245,8 +255,8 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk str_manual_pulse_off(settings.get_cur_pair_value_len());
     if (str_manual_pulse_off.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETCTRLSETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setCtrlSettings heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -268,8 +278,8 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk str_auto_setpoint(settings.get_cur_pair_value_len());
     if (str_auto_setpoint.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETCTRLSETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setCtrlSettings heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -291,8 +301,8 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk str_program_id(settings.get_cur_pair_value_len());
     if (str_program_id.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETCTRLSETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setCtrlSettings heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -314,8 +324,8 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk str_power_off_timer(settings.get_cur_pair_value_len());
     if (str_power_off_timer.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_TEMP_CTRL_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_temp_ctrl_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETCTRLSETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setCtrlSettings heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -342,9 +352,9 @@ static void post_api_temp_ctrl_settings(struct espconn *ptr_espconn, Http_parsed
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
-static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_temp_ctrl_adv_settings");
+    ALL("getCtrlAdvSettings");
     // {
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
@@ -363,8 +373,8 @@ static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_par
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_TEMP_CTRL_ADV_SETTINGS_HEAP_EXHAUSTED, str_len);
-        ERROR("get_api_temp_ctrl_adv_settings heap exhausted %d", str_len);
+        esp_diag.error(APP_GETCTRLADVSETTINGS_HEAP_EXHAUSTED, str_len);
+        ERROR("getCtrlAdvSettings heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
@@ -397,9 +407,9 @@ static void get_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_par
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void post_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void setCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("post_api_temp_ctrl_adv_settings");
+    ALL("setCtrlAdvSettings");
     // {
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
@@ -648,9 +658,9 @@ static void post_api_temp_ctrl_adv_settings(struct espconn *ptr_espconn, Http_pa
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
-static void get_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getRemoteLog(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_remote_log_settings");
+    ALL("getRemoteLog");
     //  {
     //    enabled: int,   1 digits
     //    host: string,   ...
@@ -661,8 +671,8 @@ static void get_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_REMOTELOG_SETTINGS_HEAP_EXHAUSTED, str_len);
-        ERROR("get_api_remote_log_settings heap exhausted %d", str_len);
+        esp_diag.error(APP_GETREMOTELOG_HEAP_EXHAUSTED, str_len);
+        ERROR("getRemoteLog heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted!"), false);
         return;
     }
@@ -677,9 +687,9 @@ static void get_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void setRemoteLog(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("post_api_remote_log_settings");
+    ALL("setRemoteLog");
     //  {
     //    enabled: int,   1 digits
     //    host: string,   ...
@@ -707,8 +717,8 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
     Heap_chunk str_enabled(settings.get_cur_pair_value_len());
     if (str_enabled.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_REMOTELOG_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_remote_log_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETREMOTELOG_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setRemoteLog heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -729,8 +739,8 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
     Heap_chunk settings_host(settings.get_cur_pair_value_len());
     if (settings_host.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_REMOTELOG_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_remote_log_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETREMOTELOG_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setRemoteLog heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -751,8 +761,8 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
     Heap_chunk str_port(settings.get_cur_pair_value_len());
     if (str_port.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_REMOTELOG_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_remote_log_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETREMOTELOG_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setRemoteLog heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -773,8 +783,8 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
     Heap_chunk settings_path(settings.get_cur_pair_value_len());
     if (settings_path.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_REMOTELOG_SETTINGS_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
-        ERROR("post_api_remote_log_settings heap exhausted %d", settings.get_cur_pair_value_len());
+        esp_diag.error(APP_SETREMOTELOG_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setRemoteLog heap exhausted %d", settings.get_cur_pair_value_len());
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -785,30 +795,69 @@ static void post_api_remote_log_settings(struct espconn *ptr_espconn, Http_parse
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
-static void get_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getCtrlEvents(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_program");
-    // {"prgm_count":,"headings":[]}
+    ALL("getCtrlEvents");
+    // { ctrl_events:[]}
+    // {"ts":4294967295,"tp":1,"vl":-1234},
+    // int events_count(void);
+    // struct activity_event *get_event(int idx);
+    int idx;
+    int ev_num = events_count();
+    int str_len = 17 + ev_num * 36 + 1;
+    bool first_time = true;
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(APP_GETCTRLEVENTS_HEAP_EXHAUSTED, str_len);
+        ERROR("getCtrlEvents heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
+        return;
+    }
+    fs_sprintf(msg.ref, "{\"ctrl_events\":[");
+    struct activity_event *ev_i;
+    for (idx = 0; idx < ev_num; idx++)
+    {
+        if (first_time)
+            first_time = false;
+        else
+            fs_sprintf(msg.ref + os_strlen(msg.ref), ",");
+        ev_i = get_event(idx);
+        if (ev_i)
+            fs_sprintf(msg.ref + os_strlen(msg.ref),
+                       "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                       ev_i->timestamp,
+                       ev_i->type,
+                       ev_i->value);
+    }
+    fs_sprintf(msg.ref + os_strlen(msg.ref), "]}");
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void getProgramList(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("getProgramList");
+    // {"prg_count":,"prg_headings":[]}
     // {"id":,"desc":""},
     // {
-    //     "prgm_count": 3,
-    //     "headings": [
+    //     "prg_count": 3,
+    //     "prg_headings": [
     //         {"id": 1,"desc":"first"},
     //         {"id": 2,"desc":"second"},
     //         {"id": 3,"desc":"third"}
     //     ]
     // }
-    int str_len = 29 + 1 + 2 + (18 + 2 + 33) * program_lst->size();
+    int str_len = 32 + 1 + 2 + (18 + 2 + 32) * program_lst->size();
     DEBUG("program list JSON len: %d", str_len);
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_PROGRAM_HEAP_EXHAUSTED, str_len);
-        ERROR("get_api_program heap exhausted %d", str_len);
+        esp_diag.error(APP_GETPROGRAMLIST_HEAP_EXHAUSTED, str_len);
+        ERROR("getProgramList heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         return;
     }
-    fs_sprintf(msg.ref, "{\"prgm_count\":%d,\"headings\":[", program_lst->size());
+    fs_sprintf(msg.ref, "{\"prg_count\":%d,\"prg_headings\":[", program_lst->size());
     struct prgm_headings *ptr = program_lst->front();
     bool first_time = true;
     while (ptr)
@@ -832,10 +881,10 @@ static void get_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void get_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_program_idx");
-    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/program/"));
+    ALL("getProgram");
+    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/ctrl/program/"));
     if (os_strlen(str_program_id) == 0)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No program id provided"), false);
@@ -866,8 +915,8 @@ static void get_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_PROGRAM_IDX_HEAP_EXHAUSTED, str_len);
-        ERROR("get_api_program_idx heap exhausted %d", str_len);
+        esp_diag.error(APP_GETPROGRAM_HEAP_EXHAUSTED, str_len);
+        ERROR("getProgram heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
         delete_program(program);
         return;
@@ -903,10 +952,10 @@ static void get_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void del_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void deleteProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("del_api_program_idx");
-    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/program/"));
+    ALL("deleteProgram");
+    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/ctrl/program/"));
     if (os_strlen(str_program_id) == 0)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No program id provided"), false);
@@ -924,9 +973,9 @@ static void del_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
     }
 }
 
-static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("post_api_program");
+    ALL("createProgram");
     // {
     //     "name" : "program_name",
     //     "min_temp" : 100,
@@ -952,7 +1001,7 @@ static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parse
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    //    name: string,         33 digits
+    //    name: string,         32 digits
     if (settings.find_pair(f_str("name")) != JSON_NEW_PAIR_FOUND)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'name'"), false);
@@ -963,9 +1012,9 @@ static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parse
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'name' does not have an STRING value type"), false);
         return;
     }
-    char program_name[33];
-    os_memset(program_name, 0, 33);
-    if (settings.get_cur_pair_value_len() > 32)
+    char program_name[32];
+    os_memset(program_name, 0, 32);
+    if (settings.get_cur_pair_value_len() > 31)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
@@ -1020,8 +1069,8 @@ static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parse
     Heap_chunk periods_mem(sizeof(struct prgm_period) * program.period_count);
     if (periods_mem.ref == NULL)
     {
-        esp_diag.error(APP_POST_API_PROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
-        ERROR("post_api_program heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
+        esp_diag.error(APP_CREATEPROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
+        ERROR("createProgram heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -1153,10 +1202,10 @@ static void post_api_program(struct espconn *ptr_espconn, Http_parsed_req *parse
     }
 }
 
-static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("put_api_program_idx");
-    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/program/"));
+    ALL("updateProgram");
+    char *str_program_id = parsed_req->url + os_strlen(f_str("/api/ctrl/program/"));
     if (os_strlen(str_program_id) == 0)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No program id provided"), false);
@@ -1169,7 +1218,7 @@ static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    //    name: string,         33 digits
+    //    name: string,         32 digits
     if (settings.find_pair(f_str("name")) != JSON_NEW_PAIR_FOUND)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'name'"), false);
@@ -1180,9 +1229,9 @@ static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'name' does not have an STRING value type"), false);
         return;
     }
-    char program_name[33];
-    os_memset(program_name, 0, 33);
-    if (settings.get_cur_pair_value_len() > 32)
+    char program_name[32];
+    os_memset(program_name, 0, 32);
+    if (settings.get_cur_pair_value_len() > 31)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
@@ -1237,8 +1286,8 @@ static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
     Heap_chunk periods_mem(sizeof(struct prgm_period) * program.period_count);
     if (periods_mem.ref == NULL)
     {
-        esp_diag.error(APP_PUT_API_PROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
-        ERROR("put_api_program heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
+        esp_diag.error(APP_UPDATEPROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
+        ERROR("updateProgram heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
@@ -1364,292 +1413,10 @@ static void put_api_program_idx(struct espconn *ptr_espconn, Http_parsed_req *pa
         break;
     default:
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Program modified\"}"), false);
+        // check if the running program was modified
+        if ((get_current_mode() == MODE_PROGRAM) && (get_program_id() == program_id))
+            ctrl_program(program_id);
     }
-}
-
-void run_test(int test_number, int test_param)
-{
-    // void set_remote_log(bool enabled, char* host, int port, char* path);
-    // bool get_remote_log_enabled(void);
-    // char *get_remote_log_host(void);
-    // int get_remote_log_port(void);
-    // char *get_remote_log_path(void);
-
-    switch (test_number)
-    {
-    /*
-    case 10:
-        fs_printf("---> remote log cfg\n");
-        fs_printf("---> enabled: %d\n", get_remote_log_enabled());
-        fs_printf("--->    host: %s\n", get_remote_log_host());
-        fs_printf("--->    port: %d\n", get_remote_log_port());
-        fs_printf("--->    path: %s\n", get_remote_log_path());
-        break;
-    case 11:
-        set_remote_log(false, "192.168.1.201", 21000, "/this/is/the/path");
-        break;
-    case 12:
-        set_remote_log(true, "192.168.1.102", 1880, "/activity_log");
-        break;
-
-    case 20:
-    {
-        struct _adv_ctrl_settings *adv_settings = get_adv_ctrl_settings();
-
-        fs_printf("---> advanced settings cfg\n");
-        fs_printf("{\"kp\": %d,"
-                  "\"kd\": %d,"
-                  "\"ki\": %d,"
-                  "\"u_max\": %d,"
-                  "\"heater_on_min\": %d,"
-                  "\"heater_on_max\": %d,"
-                  "\"heater_on_off\": %d,"
-                  "\"heater_cold\": %d,"
-                  "\"warm_up_period\": %d,"
-                  "\"wup_heater_on\": %d,"
-                  "\"wup_heater_off\": %d}",
-                  adv_settings->kp,
-                  adv_settings->kd,
-                  adv_settings->ki,
-                  adv_settings->u_max,
-                  adv_settings->heater_on_min,
-                  adv_settings->heater_on_max,
-                  adv_settings->heater_on_off,
-                  adv_settings->heater_cold,
-                  adv_settings->warm_up_period,
-                  adv_settings->wup_heater_on,
-                  adv_settings->wup_heater_off);
-    }
-    break;
-    case 21:
-    {
-        struct _adv_ctrl_settings adv_settings;
-
-        adv_settings.kp = 11;
-        adv_settings.kd = 12;
-        adv_settings.ki = 13;
-        adv_settings.u_max = 14;
-        adv_settings.heater_on_min = 15;
-        adv_settings.heater_on_max = 16;
-        adv_settings.heater_on_off = 17;
-        adv_settings.heater_cold = 18;
-        adv_settings.warm_up_period = 19;
-        adv_settings.wup_heater_on = 20;
-        adv_settings.wup_heater_off = 21;
-
-        set_adv_ctrl_settings(&adv_settings);
-    }
-    break;
-    case 22:
-    {
-        struct _adv_ctrl_settings adv_settings;
-
-        adv_settings.kp = 31;
-        adv_settings.kd = 32;
-        adv_settings.ki = 33;
-        adv_settings.u_max = 34;
-        adv_settings.heater_on_min = 35;
-        adv_settings.heater_on_max = 36;
-        adv_settings.heater_on_off = 37;
-        adv_settings.heater_cold = 38;
-        adv_settings.warm_up_period = 39;
-        adv_settings.wup_heater_on = 40;
-        adv_settings.wup_heater_off = 41;
-
-        set_adv_ctrl_settings(&adv_settings);
-    }
-    break;
-    */
-    case 1:
-    {
-        // print program list
-        int idx = 1;
-        struct prgm_headings *ptr = program_lst->front();
-        fs_printf("---> PROGRAM_LIST\n");
-        while (ptr)
-        {
-            fs_printf("%d - ID: %d - %s\n", idx, ptr->id, ptr->desc);
-            idx++;
-            ptr = program_lst->next();
-        }
-        fs_printf("---> END PROGRAM_LIST\n");
-    }
-    break;
-    case 2:
-    {
-        // load program
-        struct prgm *ptr = load_program(test_param);
-        if (ptr)
-        {
-            fs_printf("--->      PROGRAM %d\n", test_param);
-            fs_printf("--->     min_temp %d\n", ptr->min_temp);
-            fs_printf("---> period_count %d\n", ptr->period_count);
-            int idx;
-            for (idx = 0; idx < ptr->period_count; idx++)
-            {
-                fs_printf("---> period %d - day of week %d - start %d - end %d - setpoint %d\n",
-                          idx,
-                          ptr->period[idx].day_of_week,
-                          ptr->period[idx].mm_start,
-                          ptr->period[idx].mm_end,
-                          ptr->period[idx].setpoint);
-            }
-            fs_printf("---> END PROGRAM\n");
-        }
-        else
-        {
-            fs_printf("---> No program with id %d\n", test_param);
-        }
-    }
-    break;
-    case 3:
-    {
-        // delete program_lst
-        fs_printf("deleting program list\n");
-        int idx;
-        int up_to = program_lst->size();
-        for (idx = 0; idx < up_to; idx++)
-        {
-            program_lst->front();
-            program_lst->remove();
-        }
-        fs_printf("deleting program files\n");
-        for (idx = 0; idx < MAX_PROGRAM_COUNT; idx++)
-        {
-            char filename[33];
-            fs_snprintf(filename, 32, "program_%d.prg", idx);
-            if (Ffile::exists(&espfs, filename))
-            {
-                Ffile cfgfile(&espfs, filename);
-                fs_printf("deleting %s\n", filename);
-                cfgfile.remove();
-            }
-        }
-        fs_printf("deleting completed.\n");
-    }
-    break;
-    case 4:
-    {
-        // add a program
-        // PROGRAM
-        // {
-        //     "id": 1,
-        //     "min_temp": 100,
-        //     "period_count": 3,
-        //     "periods": [
-        //         {"wd": 8,"b":1880,"e":1880,"sp":200},
-        //         {"wd": 8,"b":1880,"e":1880,"sp":200},
-        //         {"wd": 8,"b":1880,"e":1880,"sp":200}
-        //     ]
-        // }
-        static int prg_counter = 0;
-        prg_counter++;
-        char prg_name[33];
-        fs_snprintf(prg_name, 32, "program %d", prg_counter);
-        struct prgm new_prg;
-        new_prg.min_temp = 100;
-        new_prg.period_count = (2 * prg_counter);
-        struct prgm_period periods[new_prg.period_count];
-        new_prg.period = periods;
-        int idx;
-        for (idx = 0; idx < new_prg.period_count; idx++)
-        {
-            new_prg.period[idx].day_of_week = everyday;
-            new_prg.period[idx].mm_start = (idx + 1) * 100;
-            new_prg.period[idx].mm_end = (idx + 1) * 200;
-            new_prg.period[idx].setpoint = 200;
-        }
-        fs_printf("adding program %s\n", prg_name);
-        int result = add_program(prg_name, &new_prg);
-        fs_printf("done. Result is %d.\n", result);
-        esp_stack_mon();
-    }
-    break;
-    case 5:
-    {
-        // remove program
-        fs_printf("deleting program %d\n", test_param);
-        int result = del_program(test_param);
-        fs_printf("done. Result is %d.\n", result);
-    }
-    break;
-
-    default:
-        break;
-    }
-}
-
-static void post_api_test(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-{
-    ALL("post_api_test");
-    //  {
-    //    test: int
-    //  }
-    Json_str settings(parsed_req->req_content, parsed_req->content_len);
-    if (settings.syntax_check() != JSON_SINTAX_OK)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
-        return;
-    }
-    //    test: int,         1 digits
-    int test_number;
-    if (settings.find_pair(f_str("test")) != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test'"), false);
-        return;
-    }
-    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test' does not have an INTEGER value type"), false);
-        return;
-    }
-    Heap_chunk str_test(settings.get_cur_pair_value_len());
-    if (str_test.ref == NULL)
-    {
-        ERROR("post_api_test heap exhausted %d", settings.get_cur_pair_value_len());
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-    os_strncpy(str_test.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
-    test_number = atoi(str_test.ref);
-
-    //    param: int,         1 digits
-    int test_param;
-    if (settings.find_pair(f_str("param")) != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'param'"), false);
-        return;
-    }
-    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'param' does not have an INTEGER value type"), false);
-        return;
-    }
-    Heap_chunk str_param(settings.get_cur_pair_value_len());
-    if (str_param.ref == NULL)
-    {
-        ERROR("post_api_test heap exhausted %d", settings.get_cur_pair_value_len());
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-    os_strncpy(str_param.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
-    test_param = atoi(str_param.ref);
-
-    // {"test": ,"param": }
-    int msg_len = 20 + 6 + 6 + 1;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        ERROR("post_api_test heap exhausted %d", msg_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-
-    run_test(test_number, test_param);
-
-    fs_sprintf(msg.ref, "{\"test\": %d,\"param\": %d}", test_number, test_param);
-
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
 bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1661,69 +1428,69 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         get_api_info(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_vars"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/advSettings"))) && (parsed_req->req_method == HTTP_GET))
     {
-        get_api_temp_ctrl_vars(ptr_espconn, parsed_req);
+        getCtrlAdvSettings(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_settings"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/advSettings"))) && (parsed_req->req_method == HTTP_POST))
     {
-        get_api_temp_ctrl_settings(ptr_espconn, parsed_req);
+        setCtrlAdvSettings(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_settings"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/log"))) && (parsed_req->req_method == HTTP_GET))
     {
-        post_api_temp_ctrl_settings(ptr_espconn, parsed_req);
+        getCtrlEvents(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/program"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/program"))) && (parsed_req->req_method == HTTP_GET))
     {
-        get_api_program(ptr_espconn, parsed_req);
+        getProgramList(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strncmp(parsed_req->url, f_str("/api/program/"), os_strlen(f_str("/api/program/")))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/ctrl/program/"), os_strlen(f_str("/api/ctrl/program/")))) && (parsed_req->req_method == HTTP_GET))
     {
-        get_api_program_idx(ptr_espconn, parsed_req);
+        getProgram(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strncmp(parsed_req->url, f_str("/api/program/"), os_strlen(f_str("/api/program/")))) && (parsed_req->req_method == HTTP_DELETE))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/ctrl/program/"), os_strlen(f_str("/api/ctrl/program")))) && (parsed_req->req_method == HTTP_DELETE))
     {
-        del_api_program_idx(ptr_espconn, parsed_req);
+        deleteProgram(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strncmp(parsed_req->url, f_str("/api/program/"), os_strlen(f_str("/api/program/")))) && (parsed_req->req_method == HTTP_PUT))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/ctrl/program/"), os_strlen(f_str("/api/ctrl/program")))) && (parsed_req->req_method == HTTP_PUT))
     {
-        put_api_program_idx(ptr_espconn, parsed_req);
+        updateProgram(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/program"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/program"))) && (parsed_req->req_method == HTTP_POST))
     {
-        post_api_program(ptr_espconn, parsed_req);
+        createProgram(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_adv_settings"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/remoteLog"))) && (parsed_req->req_method == HTTP_GET))
     {
-        get_api_temp_ctrl_adv_settings(ptr_espconn, parsed_req);
+        getRemoteLog(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/temp_ctrl_adv_settings"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/remoteLog"))) && (parsed_req->req_method == HTTP_POST))
     {
-        post_api_temp_ctrl_adv_settings(ptr_espconn, parsed_req);
+        setRemoteLog(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/remote_log_settings"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/settings"))) && (parsed_req->req_method == HTTP_GET))
     {
-        get_api_remote_log_settings(ptr_espconn, parsed_req);
+        getCtrlSettings(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/remote_log_settings"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/settings"))) && (parsed_req->req_method == HTTP_POST))
     {
-        post_api_remote_log_settings(ptr_espconn, parsed_req);
+        setCtrlSettings(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/test"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/vars"))) && (parsed_req->req_method == HTTP_GET))
     {
-        post_api_test(ptr_espconn, parsed_req);
+        getCtrlVars(ptr_espconn, parsed_req);
         return true;
     }
     return false;

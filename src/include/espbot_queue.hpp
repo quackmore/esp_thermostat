@@ -27,27 +27,29 @@ public:
   bool full();
   int size();
   T *front();
-  T *back();
+  T *next();
   Queue_err push(T *);
   Queue_err pop();
 
 private:
-  int m_max_size;
-  int m_size;
-  T **m_content;
-  int m_front;
-  int m_back;
+  int _max_size;
+  int _size;
+  T **_content;
+  int _front;
+  int _back;
+  int _cursor;
 };
 
 template <class T>
 Queue<T>::Queue(int max_size)
 {
-  m_max_size = max_size;
-  m_size = 0;
-  m_front = 0;
-  m_back = 0;
-  m_content = new T *[m_max_size];
-  // if (m_content == NULL)
+  _max_size = max_size;
+  _size = 0;
+  _front = 0;
+  _back = 0;
+  _content = new T *[_max_size];
+  int idx;
+  // if (_content == NULL)
   // {
   //   PRINT_ERROR("Queue - not enough heap memory [%d]\n", max_size);
   // }
@@ -56,14 +58,14 @@ Queue<T>::Queue(int max_size)
 template <class T>
 Queue<T>::~Queue()
 {
-  if (m_content)
-    delete[] m_content;
+  if (_content)
+    delete[] _content;
 }
 
 template <class T>
 bool Queue<T>::empty()
 {
-  if (m_size == 0)
+  if (_size == 0)
     return true;
   else
     return false;
@@ -72,7 +74,7 @@ bool Queue<T>::empty()
 template <class T>
 bool Queue<T>::full()
 {
-  if (m_size == m_max_size)
+  if (_size == _max_size)
     return true;
   else
     return false;
@@ -81,23 +83,31 @@ bool Queue<T>::full()
 template <class T>
 int Queue<T>::size()
 {
-  return m_size;
+  return _size;
 }
 
 template <class T>
 T *Queue<T>::front()
 {
-  if (m_size)
-    return m_content[m_front];
+  if (_size)
+  {
+    _cursor = _front;
+    return _content[_cursor];
+  }
   else
     return NULL;
 }
 
 template <class T>
-T *Queue<T>::back()
+T *Queue<T>::next()
 {
-  if (m_size)
-    return m_content[m_back];
+  _cursor++;
+  if (_cursor == _max_size)
+    _cursor = 0;
+  if (_cursor == _front)
+    return NULL;
+  if (_content[_cursor])
+    return _content[_cursor];
   else
     return NULL;
 }
@@ -105,30 +115,31 @@ T *Queue<T>::back()
 template <class T>
 Queue_err Queue<T>::push(T *elem)
 {
-  if ((m_size == m_max_size) || (m_content == NULL))
+  if ((_size == _max_size) || (_content == NULL))
     return Queue_full;
-  if (m_size > 0)
+  if (_size > 0)
   {
-    m_back++;
-    if (m_back == m_max_size)
-      m_back = 0;
+    _back++;
+    if (_back == _max_size)
+      _back = 0;
   }
-  m_size++;
-  m_content[m_back] = elem;
+  _size++;
+  _content[_back] = elem;
   return Queue_ok;
 }
 
 template <class T>
 Queue_err Queue<T>::pop()
 {
-  if (m_size == 0)
+  if (_size == 0)
     return Queue_empty;
-  m_size--;
-  m_front++;
-  if (m_front == m_max_size)
-    m_front = 0;
-  if (m_size == 0)
-    m_back = m_front;
+  _size--;
+  _content[_front] = 0;
+  _front++;
+  if (_front == _max_size)
+    _front = 0;
+  if (_size == 0)
+    _back = _front;
   return Queue_ok;
 }
 

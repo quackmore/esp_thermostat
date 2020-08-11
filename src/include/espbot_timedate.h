@@ -7,38 +7,23 @@
  * ----------------------------------------------------------------------------
  */
 
-#ifndef __WEBSERVER_HPP__
-#define __WEBSERVER_HPP__
+#ifndef __TIMEDATE_H__
+#define __TIMEDATE_H__
 
+#ifdef __cplusplus
 extern "C"
 {
+#endif
 #include "c_types.h"
-#include "espconn.h"
+#ifdef __cplusplus
 }
+#endif
 
-#define SERVER_PORT 80
-
-typedef enum
+// declared public cause it's being stored into RTC memory
+struct espbot_time
 {
-  up = 0,
-  down
-} Websvr_status;
-
-class Websvr
-{
-public:
-  Websvr(){};
-  ~Websvr(){};
-
-  void init(void);
-  void start(uint32); // port
-  void stop(void);
-  Websvr_status get_status(void);
-
-private:
-  Websvr_status _status;
-  struct espconn _esp_conn;
-  esp_tcp _esptcp;
+    uint32 sntp_time;
+    uint32 rtc_time;
 };
 
 #endif

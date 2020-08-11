@@ -156,8 +156,8 @@ void ctrl_program(int id)
         log_event(current_time->timestamp, mode_change, MODE_PROGRAM);
     }
     ctrl.mode = MODE_PROGRAM;
-    // dummy set-point
-    ctrl.setpoint = 0;
+    // default set-point
+    ctrl.setpoint = ctrl.program->min_temp;
     ctrl.stop_after = 0;
     ctrl.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
     DEBUG("TEMP CTRL -> PROGRAM MODE [%d] %s", ctrl.started_on, esp_time.get_timestr(ctrl.started_on));

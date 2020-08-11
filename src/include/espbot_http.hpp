@@ -97,7 +97,7 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
 // will check for pending requests on p_espconn
 // will add the new message part new_msg
 // will call msg_complete function one the message is complete
-void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void (*msg_complete)(void *, char *, unsigned short ));
+void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, unsigned short length, void (*msg_complete)(void *, char *, unsigned short ));
 
 
 //
@@ -124,6 +124,7 @@ public:
 struct http_send
 {
   struct espconn *p_espconn;
+  int order;
   char *msg;
   int msg_len;
 };
@@ -131,6 +132,7 @@ struct http_send
 struct http_split_send
 {
   struct espconn *p_espconn;
+  int order;
   char *content;
   int content_size;
   int content_transferred;
@@ -138,6 +140,8 @@ struct http_split_send
 };
 
 extern Queue<struct http_split_send> *pending_split_send;
+
+void clean_pending_send(struct espconn *p_espconn);
 
 // check if there are pending http send
 void http_check_pending_send(void);
@@ -158,7 +162,9 @@ char *http_format_header(class Http_header *);
 void http_send(struct espconn *p_espconn, char *msg, int msg_len);
 
 // http_send_buffer will manage calling espconn_send avoiding new calls before completion
-void http_send_buffer(struct espconn *p_espconn, char *msg, int msg_len);
+void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int msg_len);
+
+bool http_espconn_in_use(struct espconn *p_espconn);
 
 //
 // incoming response for a client
@@ -193,7 +199,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
 // will check for pending responses on p_espconn
 // will add the new message part new_msg
 // will call msg_complete function one the message is complete
-void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int length, void (*msg_complete)(void *, char *, unsigned short ));
+void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, unsigned short length, void (*msg_complete)(void *, char *, unsigned short ));
 
 //
 //

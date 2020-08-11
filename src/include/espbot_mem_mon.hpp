@@ -40,7 +40,7 @@ struct heap_item
   void *addr;
 };
 
-// #define HEAP_ARRAY_SIZE 100
+#define HEAP_ARRAY_SIZE 200
 
 class Esp_mem
 {
@@ -55,7 +55,8 @@ private:
   uint32 _heap_objs;
   uint32 _max_heap_objs;
 
-  // struct heap_item m_heap_array[HEAP_ARRAY_SIZE];
+  // DEBUG
+  // struct heap_item _heap_array[HEAP_ARRAY_SIZE];
 
   void heap_mon(void);
 
@@ -80,6 +81,8 @@ public:
   uint32 get_heap_objs(void);
   uint32 get_max_heap_objs(void);
   // struct heap_item *get_heap_item(List_item item = first); // return NULL if no item is found
+  // DEBUG
+  // void print_heap_objects(void);
 };
 
 #endif

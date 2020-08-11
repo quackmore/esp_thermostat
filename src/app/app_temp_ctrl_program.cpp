@@ -43,20 +43,20 @@ static bool restore_prgm_list(void)
     if (!cfgfile.exists())
         return false;
 
-    // prgm_count
-    if (cfgfile.find_string(f_str("prgm_count")))
+    // prg_count
+    if (cfgfile.find_string(f_str("prg_count")))
     {
         esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE);
-        ERROR("temp_control_restore_prgm_list cannot find \"prgm_count\"");
+        ERROR("temp_control_restore_prgm_list cannot find \"prg_count\"");
         return false;
     }
     int prg_count = atoi(cfgfile.get_value());
 
-    // prgm_headings
-    if (cfgfile.find_string(f_str("headings")))
+    // prg_headings
+    if (cfgfile.find_string(f_str("prg_headings")))
     {
         esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE);
-        ERROR("temp_control_restore_prgm_list cannot find \"headings\"");
+        ERROR("temp_control_restore_prgm_list cannot find \"prg_headings\"");
         return false;
     }
     Json_array_str prg_array(cfgfile.get_value(), os_strlen(cfgfile.get_value()));
@@ -111,8 +111,8 @@ static bool restore_prgm_list(void)
         }
         heading_el->id = tmp_id;
         int max_len = heading.get_cur_pair_value_len();
-        if (max_len > 32)
-            max_len = 32;
+        if (max_len > 31)
+            max_len = 31;
         os_strncpy(heading_el->desc, heading.get_cur_pair_value(), max_len);
         program_lst->push_back(heading_el);
     }
@@ -133,21 +133,21 @@ static bool saved_prgm_list_not_updated(void)
     if (!cfgfile.exists())
         return true;
 
-    // prgm_count
-    if (cfgfile.find_string(f_str("prgm_count")))
+    // prg_count
+    if (cfgfile.find_string(f_str("prg_count")))
     {
         esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE);
-        ERROR("temp_control_saved_prgm_list_not_updated cannot find \"prgm_count\"");
+        ERROR("temp_control_saved_prgm_list_not_updated cannot find \"prg_count\"");
         return true;
     }
     if (program_lst->size() != atoi(cfgfile.get_value()))
         return true;
 
-    // prgm_headings
-    if (cfgfile.find_string(f_str("headings")))
+    // prg_headings
+    if (cfgfile.find_string(f_str("prg_headings")))
     {
         esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE);
-        ERROR("temp_control_saved_prgm_list_not_updated cannot find \"headings\"");
+        ERROR("temp_control_saved_prgm_list_not_updated cannot find \"prg_headings\"");
         return true;
     }
     Json_array_str prg_array(cfgfile.get_value(), os_strlen(cfgfile.get_value()));
@@ -197,7 +197,7 @@ static bool saved_prgm_list_not_updated(void)
         }
         if (cur_heading == NULL)
             return true;
-        if ((cur_heading->id != tmp_id) || (os_strncmp(cur_heading->desc, heading.get_cur_pair_value(), 32)))
+        if ((cur_heading->id != tmp_id) || (os_strncmp(cur_heading->desc, heading.get_cur_pair_value(), 31)))
             return true;
         cur_heading = program_lst->next();
     }
@@ -248,10 +248,10 @@ static void save_prgm_list(void)
     }
 
     {
-        //  {"prgm_count": ,"headings": [
-        char buffer[(29 + 1 + 2)];
+        //  {"prg_count":,"prg_headings":[
+        char buffer[(33 + 1 + 2)];
         fs_sprintf(buffer,
-                   "{\"prgm_count\": %d,\"headings\": [",
+                   "{\"prg_count\":%d,\"prg_headings\":[",
                    program_lst->size());
         cfgfile.n_append(buffer, os_strlen(buffer));
         espmem.stack_mon();
@@ -261,8 +261,8 @@ static void save_prgm_list(void)
     struct prgm_headings *cur_heading = program_lst->front();
     for (idx = 0; idx < program_lst->size(); idx++)
     {
-        //  ,{"id": ,"desc":""}
-        char buffer[(19 + 1 + 2 + 32)];
+        //  ,{"id":,"desc":""}
+        char buffer[(18 + 1 + 2 + 31)];
         if (first_time)
         {
             first_time = false;
@@ -292,8 +292,8 @@ static void save_prgm_list(void)
 
 // PROGRAM LIST
 // {
-//     "prgm_count": 3,
-//     "headings": [
+//     "prg_count": 3,
+//     "prg_headings": [
 //         {"id": 1,"desc":"first"},
 //         {"id": 2,"desc":"second"},
 //         {"id": 3,"desc":"third"}
@@ -362,14 +362,14 @@ struct prgm *load_program(int prg_id)
         ERROR("load_program no program id %d", prg_id);
         return NULL;
     }
-    char filename[33];
-    os_memset(filename, 0, 33);
-    fs_snprintf(filename, 32, "program_%d.prg", prg_id);
+    char filename[32];
+    os_memset(filename, 0, 32);
+    fs_snprintf(filename, 31, "program_%d.prg", prg_id);
 
-    // os_strncpy(filename, cur_heading->desc, 32);
+    // os_strncpy(filename, cur_heading->desc, 31);
     // // replace all chars different by letters or numbers with '_'
     // int count;
-    // for (count = 0; count < 33; count++)
+    // for (count = 0; count < 32; count++)
     // {
     //     if (('0' <= filename[count]) && (filename[count] <= '9') ||
     //         ('A' <= filename[count]) && (filename[count] <= 'Z') ||
@@ -453,6 +453,10 @@ struct prgm *load_program(int prg_id)
     new_prg->id = prg_id;
     new_prg->min_temp = tmp_min_temp;
     new_prg->period_count = tmp_period_count;
+    // there are no periods in the program
+    if (new_prg->period_count == 0)
+        return new_prg;
+    // there are periods in the program
     new_prg->period = new struct prgm_period[tmp_period_count];
     if (new_prg->period == NULL)
     {
@@ -553,9 +557,9 @@ char *get_cur_program_name(int id)
 
 static bool save_program(struct prgm *prg)
 {
-    char filename[33];
-    os_memset(filename, 0, 33);
-    fs_snprintf(filename, 32, "program_%d.prg", prg->id);
+    char filename[32];
+    os_memset(filename, 0, 32);
+    fs_snprintf(filename, 31, "program_%d.prg", prg->id);
 
     TRACE("save_program filename %s", filename);
     // now look for file
@@ -675,7 +679,7 @@ int add_program(char *name, struct prgm *prg)
         return ERR_MEM_EXHAUSTED;
     }
     heading_ptr->id = prg_id;
-    os_strncpy(heading_ptr->desc, name, 32);
+    os_strncpy(heading_ptr->desc, name, 31);
     program_lst->push_back(heading_ptr);
     if (saved_prgm_list_not_updated())
         save_prgm_list();
@@ -696,7 +700,7 @@ int mod_program(int prg_id, char *name, struct prgm *prg)
     }
     if (heading_ptr == NULL)
         return ERR_PRG_NOT_FOUND;
-    os_strncpy(heading_ptr->desc, name, 32);
+    os_strncpy(heading_ptr->desc, name, 31);
     if (saved_prgm_list_not_updated())
         save_prgm_list();
     // override program id
@@ -712,9 +716,9 @@ int mod_program(int prg_id, char *name, struct prgm *prg)
 int del_program(int prg_id)
 {
     // delete the file
-    char filename[33];
-    os_memset(filename, 0, 33);
-    fs_snprintf(filename, 32, "program_%d.prg", prg_id);
+    char filename[32];
+    os_memset(filename, 0, 32);
+    fs_snprintf(filename, 31, "program_%d.prg", prg_id);
     TRACE("del_program filename %s", filename);
     if (espfs.is_available())
     {

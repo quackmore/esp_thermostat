@@ -50,7 +50,7 @@ void app_init_before_wifi(void)
     // cause a browser could require it for visualization...
     // init_current_time();
     //    init_temperature_readings();
-    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read);
+    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_log_read, NULL);
     // cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, temp_control_run);
     // cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, send_events_to_external_host);
     // cron_add_job(2, 0, CRON_STAR, CRON_STAR, CRON_STAR, check_ota, NULL);

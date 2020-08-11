@@ -316,6 +316,8 @@ int events_count(void)
 struct activity_event *get_event(int idx)
 {
     ALL("get_event");
+    if (idx >= REMOTE_LOG_LENGTH)
+        return NULL;
     int tmp_index = last_event_idx;
     int ii;
     idx %= REMOTE_LOG_LENGTH;
@@ -407,8 +409,8 @@ static void post_info(void *param)
     {
         int event_idx = (int)param;
 
-        // {"timestamp":4294967295,"type":1,"value":1234}
-        char event_str[47];
+        // {"timestamp":4294967295,"type":1,"value":-1234}
+        char event_str[48];
         fs_sprintf(event_str,
                    "{\"timestamp\":%d,\"type\":%d,\"value\":%d}",
                    events[event_idx].timestamp,
@@ -416,8 +418,8 @@ static void post_info(void *param)
                    events[event_idx].value);
         TRACE("remote_log_post_info event str: %s", event_str);
 
-        // "POST  HTTP/1.1rnHost: 111.111.111.111rnContent-Type: application/jsonrnAccept: */*rnConnection: keep-alivernContent-Length: 47rnrn{"timestamp":4294967295,"type":1,"value":1234}rn"
-        int msg_len = 178 + os_strlen(remote_log_vars.path);
+        // "POST  HTTP/1.1rnHost: 111.111.111.111rnContent-Type: application/jsonrnAccept: */*rnConnection: keep-alivernContent-Length: 48rnrn{"timestamp":4294967295,"type":1,"value":-1234}rn"
+        int msg_len = 179 + os_strlen(remote_log_vars.path);
         Heap_chunk msg(msg_len);
         if (msg.ref == NULL)
         {
