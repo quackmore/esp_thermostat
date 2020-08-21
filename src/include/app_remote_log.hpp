@@ -9,7 +9,7 @@
 #ifndef __APP_REMOTE_LOG_HPP__
 #define __APP_REMOTE_LOG_HPP__
 
-#define REMOTE_LOG_LENGTH 200
+#define REMOTE_LOG_LENGTH 300
 // #define REMOTE_LOG_HOST_IP "192.168.1.102"
 // #define REMOTE_LOG_HOST_PORT 1880
 // #define REMOTE_LOG_HOST_PATH "/remote_log"

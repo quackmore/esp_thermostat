@@ -795,43 +795,255 @@ static void setRemoteLog(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
 }
 
-static void getCtrlEvents(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getCtrlEvents_next(struct http_split_send *p_sr)
 {
-    ALL("getCtrlEvents");
-    // { ctrl_events:[]}
-    // {"ts":4294967295,"tp":1,"vl":-1234},
-    // int events_count(void);
-    // struct activity_event *get_event(int idx);
-    int idx;
-    int ev_num = events_count();
-    int str_len = 17 + ev_num * 36 + 1;
-    bool first_time = true;
-    Heap_chunk msg(str_len, dont_free);
-    if (msg.ref == NULL)
+    ALL("getctrlevents_next");
+    if (!http_espconn_in_use(p_sr->p_espconn))
     {
-        esp_diag.error(APP_GETCTRLEVENTS_HEAP_EXHAUSTED, str_len);
-        ERROR("getCtrlEvents heap exhausted %d", str_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
+        TRACE("getctrlevents_next espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
+        // there will be no send, so trigger a check of pending send
+        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
         return;
     }
-    fs_sprintf(msg.ref, "{\"ctrl_events\":[");
-    struct activity_event *ev_i;
-    for (idx = 0; idx < ev_num; idx++)
+    int remaining_size = (p_sr->content_size - p_sr->content_transferred) * 36 + 3;
+    if (remaining_size > get_http_msg_max_size())
     {
-        if (first_time)
-            first_time = false;
-        else
-            fs_sprintf(msg.ref + os_strlen(msg.ref), ",");
-        ev_i = get_event(idx);
-        if (ev_i)
-            fs_sprintf(msg.ref + os_strlen(msg.ref),
-                       "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
-                       ev_i->timestamp,
-                       ev_i->type,
-                       ev_i->value);
+        // the remaining content size is bigger than response_max_size
+        // will split the remaining content over multiple messages
+        int buffer_size = get_http_msg_max_size();
+        Heap_chunk buffer(buffer_size, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_NEXT_HEAP_EXHAUSTED, buffer_size);
+            ERROR("getctrlevents_next heap exhausted %d", buffer_size);
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        struct http_split_send *p_pending_response = new struct http_split_send;
+        if (p_pending_response == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_NEXT_HEAP_EXHAUSTED, sizeof(struct http_split_send));
+            ERROR("getctrlevents_next not heap exhausted %dn", sizeof(struct http_split_send));
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            delete[] buffer.ref;
+            return;
+        }
+        struct activity_event *ev_i;
+        int ev_count = buffer_size / 36 + p_sr->content_transferred;
+        int idx;
+        for (idx = p_sr->content_transferred; idx < ev_count; idx++)
+        {
+            fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            ev_i = get_event(idx);
+            if (ev_i)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref),
+                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           ev_i->timestamp,
+                           ev_i->type,
+                           ev_i->value);
+        }
+        // setup the remaining message
+        p_pending_response->p_espconn = p_sr->p_espconn;
+        p_pending_response->order = p_sr->order + 1;
+        p_pending_response->content = p_sr->content;
+        p_pending_response->content_size = p_sr->content_size;
+        p_pending_response->content_transferred = p_sr->content_transferred + ev_count;
+        p_pending_response->action_function = getCtrlEvents_next;
+        Queue_err result = pending_split_send->push(p_pending_response);
+        if (result == Queue_full)
+        {
+            delete[] buffer.ref;
+            delete p_pending_response;
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_NEXT_PENDING_RES_QUEUE_FULL);
+            ERROR("getctrlevents_next full pending res queue");
+            return;
+        }
+        TRACE("getctrlevents_next: *p_espconn: %X, msg (splitted) len: %d",
+              p_sr->p_espconn, buffer_size);
+        http_send_buffer(p_sr->p_espconn, p_sr->order, buffer.ref, os_strlen(buffer.ref));
     }
-    fs_sprintf(msg.ref + os_strlen(msg.ref), "]}");
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    else
+    {
+        // this is the last piece of the message
+        Heap_chunk buffer(remaining_size, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_NEXT_HEAP_EXHAUSTED, remaining_size);
+            ERROR("getctrlevents_next heap exhausted %d", remaining_size);
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        struct activity_event *ev_i;
+        int idx;
+        for (idx = p_sr->content_transferred; idx < p_sr->content_size; idx++)
+        {
+            fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            ev_i = get_event(idx);
+            if (ev_i)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref),
+                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           ev_i->timestamp,
+                           ev_i->type,
+                           ev_i->value);
+        }
+        fs_sprintf(buffer.ref + os_strlen(buffer.ref), "]}");
+        TRACE("getctrlevents_next: *p_espconn: %X, msg (splitted) len: %d",
+              p_sr->p_espconn, remaining_size);
+        http_send_buffer(p_sr->p_espconn, p_sr->order, buffer.ref, os_strlen(buffer.ref));
+    }
+}
+
+void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
+{
+    // {"ctrl_events":[]}
+    // {"ts":4294967295,"tp":1,"vl":-1234},
+    ALL("getCtrlEvents_first");
+    // let's start with the header
+    Http_header header;
+    header.m_code = HTTP_OK;
+    header.m_content_type = HTTP_CONTENT_JSON;
+    int ev_num = events_count();
+    // calculate the effective content_len
+    int content_len = 18 - 1;
+    {
+        int idx;
+        char buffer[37];
+        struct activity_event *ev_i;
+        for (idx = 0; idx < ev_num; idx++)
+        {
+            ev_i = get_event(idx);
+            if (ev_i)
+                fs_sprintf(buffer,
+                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d},",
+                           ev_i->timestamp,
+                           ev_i->type,
+                           ev_i->value);
+            content_len += os_strlen(buffer);
+        }
+    }
+    header.m_content_length = content_len;
+    header.m_content_range_start = 0;
+    header.m_content_range_end = 0;
+    header.m_content_range_total = 0;
+    if (parsed_req->origin)
+    {
+        header.m_origin = new char[(os_strlen(parsed_req->origin) + 1)];
+        if (header.m_origin == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_FIRST_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            ERROR("getctrlevents_first heap exhausted %d", (os_strlen(parsed_req->origin) + 1));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        os_strcpy(header.m_origin, parsed_req->origin);
+    }
+    char *header_str = http_format_header(&header);
+    if (header_str == NULL)
+    {
+        esp_diag.error(APP_ROUTES_GETCTRLEVENTS_FIRST_HEAP_EXHAUSTED, (os_strlen(header_str)));
+        ERROR("getctrlevents_first heap exhausted %d", (os_strlen(header_str)));
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+        return;
+    }
+    // ok send the header
+    http_send_buffer(p_espconn, 0, header_str, os_strlen(header_str));
+
+    // and now the content
+    if (content_len > get_http_msg_max_size())
+    {
+        // will split the content over multiple messages
+        // each the size of http_msg_max_size
+        int buffer_size = get_http_msg_max_size();
+        Heap_chunk buffer(buffer_size, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_FIRST_HEAP_EXHAUSTED, buffer_size);
+            ERROR("getctrlevents_first heap exhausted %d", buffer_size);
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        struct http_split_send *p_pending_response = new struct http_split_send;
+        if (p_pending_response == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_FIRST_HEAP_EXHAUSTED, sizeof(struct http_split_send));
+            ERROR("getctrlevents_first heap exhausted %d", sizeof(struct http_split_send));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            delete[] buffer.ref;
+            return;
+        }
+        fs_sprintf(buffer.ref, "{\"ctrl_events\":[");
+        bool first_time = true;
+        struct activity_event *ev_i;
+        int ev_count = (buffer_size - 18) / 36;
+        int idx;
+        for (idx = 0; idx < ev_count; idx++)
+        {
+            if (first_time)
+                first_time = false;
+            else
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            ev_i = get_event(idx);
+            if (ev_i)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref),
+                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           ev_i->timestamp,
+                           ev_i->type,
+                           ev_i->value);
+        }
+        // setup the next message
+        p_pending_response->p_espconn = p_espconn;
+        p_pending_response->order = 2;
+        p_pending_response->content = "";
+        p_pending_response->content_size = ev_num;
+        p_pending_response->content_transferred = ev_count;
+        p_pending_response->action_function = getCtrlEvents_next;
+        Queue_err result = pending_split_send->push(p_pending_response);
+        if (result == Queue_full)
+        {
+            delete[] buffer.ref;
+            delete p_pending_response;
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_FIRST_PENDING_RES_QUEUE_FULL);
+            ERROR("getctrlevents_first full pending response queue");
+            return;
+        }
+        // send the content fragment
+        TRACE("getctrlevents_first *p_espconn: %X, msg (splitted) len: %d", p_espconn, buffer_size);
+        http_send_buffer(p_espconn, 1, buffer.ref, os_strlen(buffer.ref));
+        espmem.stack_mon();
+    }
+    else
+    {
+        // no need to split the content over multiple messages
+        Heap_chunk buffer(content_len, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(APP_ROUTES_GETCTRLEVENTS_FIRST_HEAP_EXHAUSTED, content_len);
+            ERROR("getctrlevents_first heap exhausted %d", content_len);
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        fs_sprintf(buffer.ref, "{\"ctrl_events\":[");
+        struct activity_event *ev_i;
+        bool first_time = true;
+        int idx;
+        for (idx = 0; idx < ev_num; idx++)
+        {
+            if (first_time)
+                first_time = false;
+            else
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            ev_i = get_event(idx);
+            if (ev_i)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref),
+                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           ev_i->timestamp,
+                           ev_i->type,
+                           ev_i->value);
+        }
+        fs_sprintf(buffer.ref + os_strlen(buffer.ref), "]}");
+        TRACE("getctrlevents_first *p_espconn: %X, msg (full) len: %d", p_espconn, content_len);
+        http_send_buffer(p_espconn, 1, buffer.ref, os_strlen(buffer.ref));
+    }
 }
 
 static void getProgramList(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1440,7 +1652,7 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/log"))) && (parsed_req->req_method == HTTP_GET))
     {
-        getCtrlEvents(ptr_espconn, parsed_req);
+        getCtrlEvents_first(ptr_espconn, parsed_req);
         return true;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/program"))) && (parsed_req->req_method == HTTP_GET))

@@ -17,6 +17,10 @@ function update_page() {
 }
 
 $('#history_refresh').on('click', function () {
+  $('#awaiting').modal('show');
+  setTimeout(function () {
+    $('#awaiting').modal('hide');
+  }, 1000);
   update_page();
 });
 
@@ -107,8 +111,8 @@ function formatData(data) {
       min_temp = min_sp;
     if (max_temp < max_sp)
       max_temp = max_sp;
-    min_temp = min_temp - (max_temp - min_temp);
-    max_temp = max_temp + (max_temp - min_temp) / 3;
+    min_temp = min_temp - (max_temp - min_temp) / 5;
+    max_temp = max_temp + (max_temp - min_temp) / 2;
   }
   if (humidityData.length > 0) {
     if (humidityData[0].x > (new Date(startDate * 1000))) {
