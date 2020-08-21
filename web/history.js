@@ -13,7 +13,6 @@ function update_page() {
   setTimeout(function () {
     createChart();
   }, 500);
-
 }
 
 $('#history_refresh').on('click', function () {
@@ -256,7 +255,7 @@ function max_array_val(array) {
   array.forEach(function (element) {
     if (element.y > max_val)
       max_val = element.y;
-  })
+  });
   return max_val;
 }
 
@@ -265,6 +264,6 @@ function min_array_val(array) {
   array.forEach(function (element) {
     if (element.y < min_val)
       min_val = element.y;
-  })
+  });
   return min_val;
 }
