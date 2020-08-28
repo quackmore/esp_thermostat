@@ -847,7 +847,7 @@ static void getCtrlEvents_next(struct http_split_send *p_sr)
         p_pending_response->order = p_sr->order + 1;
         p_pending_response->content = p_sr->content;
         p_pending_response->content_size = p_sr->content_size;
-        p_pending_response->content_transferred = p_sr->content_transferred + ev_count;
+        p_pending_response->content_transferred = ev_count;
         p_pending_response->action_function = getCtrlEvents_next;
         Queue_err result = pending_split_send->push(p_pending_response);
         if (result == Queue_full)
