@@ -15,7 +15,9 @@ A 'sleep timer' is available, you can specify how many minutes you want the ther
 A 'sleep timer' is available, you can specify how many minutes you want the thermostat to stay in AUTO mode before going OFF.
 - PROGRAM: a 'program' is a sequence of time intervals specified by 'day of the week', 'start time', 'end time' and 'temperature setpoint'. A default 'temperature setpoint' is also provided to be used when no other setpoint is available. Up to 10 programs can be pre-defined an stored on the device, see 'Configuring and using Programs' later on.
 
-The thermostat APP can log any change in temperature reading, working mode and heater status to an external host using the following format:
+The thermostat APP logs changes in temperature and relative humidity reading, temperature set-point and heater status, and represent all the data graphically.
+
+The thermostat APP can log any change in temperature and relative humidity reading, working mode and heater status to an external host using the following format:
 
     POST your_path HTTP/1.1
     Host: your_host_ip
@@ -23,18 +25,19 @@ The thermostat APP can log any change in temperature reading, working mode and h
     Accept: */*
     Connection: keep-alive
     Content-Length: 47
-    {"timestamp":4294967295,"type":1,"value":1234}
+    {"timestamp":1599142201,"type":1,"value":1234}
 
   event types are:
 
-    1 - temperature value changed
+    1 - temperature reading changed
     2 - heater on/off
     3 - control mode change
     4 - temperature setpoint_change
+    5 - relative humidity reading changed
 
 The thermostat APP hosts a web server and can be controlled by a web interface connecting your browser to your_device_IP_address.
 
-## Using the web interface (best viewed with Chrome)
+## Using the web interface
 
 ### Configuring and using Programs
 
@@ -62,12 +65,11 @@ Outside that time interval don't let the temperature go below 10°C.
 
 ##### Weekly program
 
-![Weekly program](pics/weekly-program.png)
+![Weekly program](pics/weekly-program-1.png) ![Weekly program](pics/weekly-program-2.png)
 
 This is a more complex program that says:
 
 - on working days ('Mon' to 'Fri') keep the temperature close to 20°C between 06:30 and 08:00 and between 18:00 and 22:00.
-- on working days ('Mon' to 'Fri') keep the temperature close to 18°C between 08:00 and 18:00.
 - on weekends ('Sat' and 'Sun') keep the temperature close to 20°C between 07:30 and 22:00.
 - never let the temperature go below 10°C.
 
@@ -75,15 +77,69 @@ This is a more complex program that says:
 
 (build commands are available as VS tasks)
 
-- Configure the environment running the command
+Required:
 
+- [Espressif NON-OS SDK] (<https://github.com/espressif/ESP8266_NONOS_SDK)> in a separate repository.
+- [esp-open-sdk toolchain] (<https://github.com/pfalcon/esp-open-sdk)> in a separate repository; build the bare Xtensa toolchain and leave ESP8266 SDK separate using:
+
+      make STANDALONE=n
+
+Build steps (linux)
+
+- Clone the repository.
+- Customize build variables according to your ESP8266 module and environment:
+
+      cd <your path>/thermostat
       ./gen_env.sh
-- Build user1.bin running the command
 
-      source ./env.sh && make -e APP=1 all
-- Build user2.bin running the command
+      this will generate a env.sh file
+      for instance a WEMOS D1 mini file will look like this:
+      
+      export SDK_DIR=<your path to ESP8266_NONOS_SDK>
+      export COMPILE=gcc
+      export BOOT=new
+      export APP=1
+      export SPI_SPEED=40
+      export SPI_MODE=DIO
+      export SPI_SIZE_MAP=4
+      export COMPILE=gcc
+      export COMPORT=<your COM port>
+      export CC_DIR=<your path to compiler>
+      export PATH=$PATH:<your path to compiler>
+      export SDK_DIR=<your path to ESP8266_NONOS_SDK>
+      export BOOT=new
+      export APP=1
+      export SPI_SPEED=40
+      export FREQDIV=0
+      export SPI_MODE=dio
+      export MODE=2
+      export SPI_SIZE_MAP=6
+      export FLASH_SIZE=4096
+      export LD_REF=2048
+      export FLASH_OPTIONS=" write_flash -fm dio -fs 32m-c1 -ff 40m "
+      export FLASH_INIT="0x3FB000 <your path to ESP8266_NONOS_SDK>/bin/blank.bin 0x3FC000 <your path to ESP8266_NONOS_SDK>/bin/esp_init_data_default_v08.bin 0x3FE000 <your path to ESP8266_NONOS_SDK>/blank.bin"
 
-      source ./env.sh && make -e APP=2 all
+- Building (commands available as tasks in case you are using Visual Studio)
+  
+  Clean project
+  
+      source ${workspaceFolder}/env.sh && make clean
+
+  Building current user#.bin
+
+      source ${workspaceFolder}/env.sh && make all
+
+  Building user1.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=1 all
+
+  Building user2.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=2 all
+
+  Building both user1.bin and user2.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=1 all && make -e APP=2 all
 
 ## Setup the device
 
@@ -91,21 +147,33 @@ This is a more complex program that says:
 
 (flash commands are also available as VS tasks)
 
-- Erase the flash running the command
+Flashing ESP8266 using esptool.py (checkout your distribution packages or [github repository](https://github.com/espressif/esptool)) (commands available as tasks in case you are using Visual Studio)
+  
+  Erase flash
+  
+      source ${workspaceFolder}/env.sh && make flash_erase
 
-      source ./env.sh && make flash_erase
-- Init the flash (flashing SDK params) running the command
+  Flash the bootloader
+  
+      source ${workspaceFolder}/env.sh && make flash_boot
 
-      source ./env.sh && make flash_init
-- Flash the boot running the command
+  Flash init
+  
+      source ${workspaceFolder}/env.sh && make flash_init
 
-      source ./env.sh && make flash_boot
-- Flash the application running the command
+  Flash current user#.bin
+  
+      source ${workspaceFolder}/env.sh && make flash
 
-      source ./env.sh && make -e APP=1 flash
-      source ./env.sh && make -e APP=2 flash
+  Flash user1.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=1 flash
 
-### Create a minimum configuration (and checkout some useful commands)
+  Flash user2.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=2 flash
+
+### Wifi setup
 
 - wifi connection: without configuration the ESP device will work as a Wifi AP with SSID=ESPBOT-chip_id and password=espbot123456
 
@@ -115,144 +183,20 @@ This is a more complex program that says:
           "station_pwd": "your_Wifi_password"
       }
   this will make the device stop working as AP and connect to your Wifi AP
-- device name (and SSID)
-
-      curl --location --request POST "http://{{host}}/api/espbot/cfg" \
-      --header "Content-Type: application/json" \
-      --data-raw '{
-          "espbot_name": "your_device_name"
-      }'
-- enable cron (will run temperature reading and control)
-
-      curl --location --request POST 'http://{{host}}/api/cron' \
-      --header 'Content-Type: application/json' \
-      --data-raw '{
-          "cron_enabled": 1
-      }'
-- enable mDns (if you want to access your device as <http://your_device_name.local>)
-
-      curl --location --request POST 'http://{{host}}/api/mdns' \
-      --header 'Content-Type: application/json' \
-      --data-raw '{
-          "mdns_enabled": 1
-      }'
-- disable mDns (if you don't care)
-
-      curl --location --request POST 'http://{{host}}/api/mdns' \
-      --header 'Content-Type: application/json' \
-      --data-raw '{
-          "mdns_enabled": 0
-      }'
-- setup SNTP and timezone (use this function to correct the timezone for daylight saving time)
-
-      curl --location --request POST 'http://{{host}}/api/sntp' \
-      --header 'Content-Type: application/json' \
-      --data-raw '{
-          "sntp_enabled": 1,
-          "timezone": your_time_zone
-      }'
-- setup diagnostic reporting
-
-      curl --location --request POST 'http://{{host}}/api/diag/cfg' \
-      --header 'Content-Type: application/json' \
-      --data-raw '{
-          "diag_led_mask": 7,
-          "serial_log_mask": 31
-      }'
-
-  examples:
-
-      "diag_led_mask": FATAL | ERROR | WARN
-      will report that a fatal, error or warning event occurred by lighting the esp led (D4)
-      (acknowledging the events throught the web interface will turn off the led)
-
-  logger levels:
-  
-      0 OFF    no logging
-      1 FATAL  fatal events
-      2 ERROR  error events
-      4 WARN   warning events
-      8 INFO   information events
-      16 DEBUG debug events
-      32 TRACE trace events
-      64 ALL   all the events
-  
-  the serial_log_mask define which information is printed to the serial line (BIT_RATE_460800)
-  you can checkout the diagnostic configuration using
-
-      curl --location --request GET "http://{{host}}/api/debug/log"
-- OTA upgrade
-
-      curl --location --request POST 'http://{{host}}/api/ota/cfg' \
-      --header 'Content-Type: application/json' \
-      --data-raw '{
-          "host": "your_server",
-          "port": your_port,
-          "path": "your_path",
-          "check_version": "true",
-          "reboot_on_completion": "true"
-      }
-
-  you will need a webserver where to place the user1.bin and user2.bin files
-  the easiest way is using docker:
-
-      docker run -d --name esp8266-http-upgrade -p 80:80 -v $(pwd)/bin/upgrade/www:/usr/share/nginx/html:ro nginx:alpine
-  
-  start an OTA upgrade with the command
-
-      curl --location --request POST "http://{{host}}/api/ota/upgrade"
-- useful commands:
-  - get device information:
-
-        curl --location --request GET "http://{{host}}/api/info"
-        answer example:
-        {
-          "app_name": "APP_NAME",
-          "app_version": "v0.2-5-g54311a5",
-          "espbot_name": "DEVICE_NAME",
-          "espbot_version": "v1.0-77-gf5ecd69",
-          "library_version": "v1.0-19-gcbb0044",
-          "chip_id": "2426995",
-          "sdk_version": "3.1.0-dev(b1f42da)",
-          "boot_version": "7"
-        }
-  - get memory information:
-
-        curl --location --request GET "http://{{host}}/api/debug/meminfo"
-        answer example:
-        {
-          "stack_max_addr": "3FFFFE00",
-          "stack_min_addr": "3FFFF5F0",
-          "heap_start_addr": "3FFF9000",
-          "heap_free_size": 8784,
-          "heap_max_size": 12288,
-          "heap_min_size": 4880,
-          "heap_objs": 39,
-          "heap_max_objs": 50
-        }
-  - get last reset information:
-
-        curl --location --request GET "http://{{host}}/api/debug/last_rst"
-        answer example:
-        {
-          "date": "Wed Dec 11 09:53:32 2019",
-          "reason": 4,
-          "exccause": 0,
-          "epc1": 0,
-          "epc2": 0,
-          "epc3": 0,
-          "evcvaddr": 0,
-          "depc": 0
-        }
 
 ### Uploading web server files
 
 Use the [espUploadFile](https://github.com/quackmore/esp_utils) bash script to upload files to the ESP8266 device
 
-- cd to web directory
-- run "espUploadFile 'your device IP address' index.html"
-- run "espUploadFile 'your device IP address' html_dyn.js"
-- run "espUploadFile 'your device IP address' event_codes.js"
+- cd to web-min (minimized js scripts) directory and upload each file to the device running the following command
+- espUploadFile filename 'your device IP address'
+
+### Minimum device configuration
+
+ESP Thermostat requires following minimum configuration (using the web interface)
+
+- cron 'enabled'
+- SNTP 'enabled' (for time precision)
 
 ## License
 
