@@ -9,10 +9,7 @@ $(document).ready(function () {
 });
 
 function update_page() {
-  esp_get_history(formatData);
-  setTimeout(function () {
-    createChart();
-  }, 500);
+  esp_get_history();
 }
 
 $('#history_refresh').on('click', function () {
@@ -33,10 +30,18 @@ function esp_get_history() {
     url: esp8266.url + '/api/ctrl/log',
     dataType: 'json',
     crossDomain: esp8266.cors,
-    timeout: 2000,
+    timeout: 5000,
     success: function (data) {
-      sort_data(data.ctrl_events)
-        .then(formatData(data.ctrl_events));
+      Promise.resolve()
+        .then(function () {
+          return Promise.resolve(data.ctrl_events.sort(function (a, b) { return (a.ts - b.ts); }));
+        })
+        .then(function () {
+          return Promise.resolve(formatData(data.ctrl_events));
+        })
+        .then(function () {
+          createChart();
+        })
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
