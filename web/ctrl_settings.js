@@ -2,131 +2,35 @@
 
 // spinner while awaiting for page load
 $(document).ready(function () {
-  setTimeout(function () {
-    $('#awaiting').modal('hide');
-  }, 1000);
-  update_page();
+  esp_get_prg_list().then(function (data) {
+    update_program_list(data).then(function (data) {
+      update_programs(data).then(function () {
+        esp_get_ctrl_settings().then(function () {
+          esp_get_ctrl_adv_settings().then(function () {
+            esp_get_rl_settings().then(function () {
+              hide_spinner(500);
+            })
+          })
+        })
+      })
+    })
+  })
 });
 
-function update_page() {
-  update_program_list();
-  setTimeout(function () {
-    update_advCtrlSettings();
-    update_rLogSettings();
-  }, 200);
-  setTimeout(function () {
-    update_programs();
-  }, 400);
-}
+// SETTINGS
 
-// Settings
-
-function esp_get_prg_list(success_cb) {
-  $.ajax({
+function esp_get_prg_list() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/ctrl/program',
+    url: '/api/ctrl/program',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: null,
+    error: query_err
   });
 }
 
-function esp_get_ctrl_settings(success_cb) {
-  $.ajax({
-    type: 'GET',
-    url: esp8266.url + '/api/ctrl/settings',
-    dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
-  });
-}
-
-$('#sett_off_timer').change(function () {
-  $('#sett_off_timer').val(Math.floor($('#sett_off_timer').val()))
-});
-
-$('#sett_man_on').change(function () {
-  $('#sett_man_on').val(Math.floor($('#sett_man_on').val()))
-});
-
-$('#sett_man_off').change(function () {
-  $('#sett_man_off').val(Math.floor($('#sett_man_off').val()))
-});
-
-$('#sett_ctrl_mode').change(function () {
-  refresh_settings_view();
-});
-
-$('#sett_manual').change(function () {
-  refresh_settings_view();
-});
-
-$('#sett_off_timer_en').change(function () {
-  refresh_settings_view();
-});
-
-$('#sett_refresh').click(function () {
-  update_program_list();
-});
-
-$('#sett_save').click(function () {
-  if (!($('#sett_prg_name').val()) && (parseInt($('#sett_ctrl_mode').val()) == 3)) {
-    alert("Cannot save null program...");
-    return;
-  }
-  $.ajax({
-    type: 'POST',
-    url: esp8266.url + '/api/ctrl/settings',
-    dataType: 'json',
-    contentType: 'application/json',
-    data: JSON.stringify(ctrlSettings()),
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function () {
-      alert("Settings saved.");
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
-  });
-});
-
-function ctrlSettings() {
-  var ctrl_sett = new Object;
-  ctrl_sett.ctrl_mode = parseInt($('#sett_ctrl_mode').val());
-  if ($('#sett_manual').val() == 0)
-    ctrl_sett.manual_pulse_on = 0;
-  else
-    ctrl_sett.manual_pulse_on = parseInt($('#sett_man_on').val());
-  ctrl_sett.manual_pulse_off = parseInt($('#sett_man_off').val());
-  ctrl_sett.auto_setpoint = parseFloat($('#sett_auto_sp').val()) * 10;
-  if ($('#sett_prg_name').val()) {
-    ctrl_sett.program_id = parseInt($('#sett_prg_name').val());
-  }
-  else {
-    ctrl_sett.program_id = 0;
-  }
-  if ($('#sett_off_timer_en').val() == 0)
-    ctrl_sett.power_off_timer = 0;
-  else
-    ctrl_sett.power_off_timer = parseInt($('#sett_off_timer').val());
-  return ctrl_sett;
-}
-
-function update_program_list() {
-  esp_get_prg_list(function (data) {
+function update_program_list(data) {
+  return new Promise(function (resolve) {
     $('#sett_prg_name')
       .empty()
       .append(function () {
@@ -137,8 +41,36 @@ function update_program_list() {
         };
         return options;
       });
-    update_settings();
+    resolve(data);
   });
+}
+
+function esp_get_ctrl_settings() {
+  return esp_query({
+    type: 'GET',
+    url: '/api/ctrl/settings',
+    dataType: 'json',
+    success: update_settings,
+    error: query_err
+  });
+}
+
+function update_settings(data) {
+  $('#sett_ctrl_mode').val(data.ctrl_mode);
+  if (data.manual_pulse_on == 0)
+    $('#sett_manual').val(0);
+  else
+    $('#sett_manual').val(1);
+  $('#sett_man_on').val(data.manual_pulse_on);
+  $('#sett_man_off').val(data.manual_pulse_off);
+  $('#sett_auto_sp').val((data.auto_setpoint / 10).toFixed(1));
+  $('#sett_prg_name').val(data.program_id);
+  if (data.pwr_off_timer == 0)
+    $('#sett_off_timer_en').val(0);
+  else
+    $('#sett_off_timer_en').val(1);
+  $('#sett_off_timer').val(data.pwr_off_timer);
+  refresh_settings_view();
 }
 
 function refresh_settings_view() {
@@ -185,28 +117,55 @@ function refresh_settings_view() {
   }
 }
 
-function update_settings(data) {
-  esp_get_ctrl_settings(function (data) {
-    $('#sett_ctrl_mode').val(data.ctrl_mode);
-    if (data.manual_pulse_on == 0)
-      $('#sett_manual').val(0);
-    else
-      $('#sett_manual').val(1);
-    $('#sett_man_on').val(data.manual_pulse_on);
-    $('#sett_man_off').val(data.manual_pulse_off);
-    $('#sett_auto_sp').val((data.auto_setpoint / 10).toFixed(1));
-    $('#sett_prg_name').val(data.program_id);
-    if (data.pwr_off_timer == 0)
-      $('#sett_off_timer_en').val(0);
-    else
-      $('#sett_off_timer_en').val(1);
-    $('#sett_off_timer').val(data.pwr_off_timer);
-    refresh_settings_view();
+$('#sett_off_timer').change(function () {
+  $('#sett_off_timer').val(Math.floor($('#sett_off_timer').val()))
+});
+
+$('#sett_man_on').change(function () {
+  $('#sett_man_on').val(Math.floor($('#sett_man_on').val()))
+});
+
+$('#sett_man_off').change(function () {
+  $('#sett_man_off').val(Math.floor($('#sett_man_off').val()))
+});
+
+$('#sett_ctrl_mode').change(function () {
+  refresh_settings_view();
+});
+
+$('#sett_manual').change(function () {
+  refresh_settings_view();
+});
+
+$('#sett_off_timer_en').change(function () {
+  refresh_settings_view();
+});
+
+$('#sett_refresh').click(function () {
+  show_spinner().then(function () {
+    esp_get_prg_list().then(function (data) {
+      update_program_list(data).then(function () {
+        esp_get_ctrl_settings().then(function () {
+          hide_spinner(500)
+        });
+      });
+    });
+  });
+});
+
+function save_ctrl_settings() {
+  return esp_query({
+    type: 'POST',
+    url: '/api/ctrl/settings',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(ctrlSettings()),
+    success: null,
+    error: query_err
   });
 }
 
-
-function jsonify_settings() {
+function ctrlSettings() {
   var ctrl_sett = new Object;
   ctrl_sett.ctrl_mode = parseInt($('#sett_ctrl_mode').val());
   if ($('#sett_manual').val() == 0)
@@ -214,7 +173,7 @@ function jsonify_settings() {
   else
     ctrl_sett.manual_pulse_on = parseInt($('#sett_man_on').val());
   ctrl_sett.manual_pulse_off = parseInt($('#sett_man_off').val());
-  ctrl_sett.auto_setpoint = parseFloat($('#setpoint').val()) * 10;
+  ctrl_sett.auto_setpoint = parseFloat($('#sett_auto_sp').val()) * 10;
   if ($('#sett_prg_name').val()) {
     ctrl_sett.program_id = parseInt($('#sett_prg_name').val());
   }
@@ -222,67 +181,82 @@ function jsonify_settings() {
     ctrl_sett.program_id = 0;
   }
   if ($('#sett_off_timer_en').val() == 0)
-    ctrl_sett.pwr_off_timer = 0;
+    ctrl_sett.power_off_timer = 0;
   else
-    ctrl_sett.pwr_off_timer = parseInt($('#sett_off_timer').val());
+    ctrl_sett.power_off_timer = parseInt($('#sett_off_timer').val());
   return ctrl_sett;
 }
 
+// function jsonify_settings() {
+//   var ctrl_sett = new Object;
+//   ctrl_sett.ctrl_mode = parseInt($('#sett_ctrl_mode').val());
+//   if ($('#sett_manual').val() == 0)
+//     ctrl_sett.manual_pulse_on = 0;
+//   else
+//     ctrl_sett.manual_pulse_on = parseInt($('#sett_man_on').val());
+//   ctrl_sett.manual_pulse_off = parseInt($('#sett_man_off').val());
+//   ctrl_sett.auto_setpoint = parseFloat($('#setpoint').val()) * 10;
+//   if ($('#sett_prg_name').val()) {
+//     ctrl_sett.program_id = parseInt($('#sett_prg_name').val());
+//   }
+//   else {
+//     ctrl_sett.program_id = 0;
+//   }
+//   if ($('#sett_off_timer_en').val() == 0)
+//     ctrl_sett.pwr_off_timer = 0;
+//   else
+//     ctrl_sett.pwr_off_timer = parseInt($('#sett_off_timer').val());
+//   return ctrl_sett;
+// }
+// 
+$('#sett_save').click(function () {
+  if (!($('#sett_prg_name').val()) && (parseInt($('#sett_ctrl_mode').val()) == 3)) {
+    alert("Cannot save null program...");
+    return;
+  }
+  show_spinner().then(function () {
+    save_ctrl_settings().then(function () {
+      alert("Setting saved.");
+      hide_spinner(500);
+    });
+  });
+});
+
 // ADVANCED CONTROL SETTINGS
 
-function esp_get_ctrl_adv_settings(success_cb) {
-  $.ajax({
+function esp_get_ctrl_adv_settings() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/ctrl/advSettings',
+    url: '/api/ctrl/advSettings',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_advCtrlSettings,
+    error: query_err
   });
+}
+
+function update_advCtrlSettings(data) {
+  $('#adv_sett_kp').val(data.kp);
+  $('#adv_sett_kd').val(data.kd);
+  $('#adv_sett_ki').val(data.ki);
+  $('#adv_sett_u_max').val(data.u_max);
+  $('#adv_sett_heater_on_min').val(data.heater_on_min);
+  $('#adv_sett_heater_on_max').val(data.heater_on_max);
+  $('#adv_sett_heater_on_off').val(data.heater_on_off);
+  $('#adv_sett_heater_cold').val(data.heater_cold);
+  $('#adv_sett_warm_up_period').val(data.warm_up_period);
+  $('#adv_sett_wup_heater_on').val(data.wup_heater_on);
+  $('#adv_sett_wup_heater_off').val(data.wup_heater_off);
 }
 
 $('#adv_sett_refresh').click(function () {
-  update_advCtrlSettings();
+  show_spinner()
+    .then(function () {
+      esp_get_ctrl_adv_settings()
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
-
-$('#adv_sett_save').click(function () {
-  $.ajax({
-    type: 'POST',
-    url: esp8266.url + '/api/ctrl/advSettings',
-    dataType: 'json',
-    contentType: 'application/json',
-    data: JSON.stringify(jsonify_advCtrlSettings()),
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function () {
-      alert("Settings saved.");
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
-  });
-});
-
-function update_advCtrlSettings() {
-  esp_get_ctrl_adv_settings(function (data) {
-    $('#adv_sett_kp').val(data.kp);
-    $('#adv_sett_kd').val(data.kd);
-    $('#adv_sett_ki').val(data.ki);
-    $('#adv_sett_u_max').val(data.u_max);
-    $('#adv_sett_heater_on_min').val(data.heater_on_min);
-    $('#adv_sett_heater_on_max').val(data.heater_on_max);
-    $('#adv_sett_heater_on_off').val(data.heater_on_off);
-    $('#adv_sett_heater_cold').val(data.heater_cold);
-    $('#adv_sett_warm_up_period').val(data.warm_up_period);
-    $('#adv_sett_wup_heater_on').val(data.wup_heater_on);
-    $('#adv_sett_wup_heater_off').val(data.wup_heater_off);
-  });
-}
 
 function jsonify_advCtrlSettings() {
   var adv_settings = new Object;
@@ -300,57 +274,57 @@ function jsonify_advCtrlSettings() {
   return adv_settings;
 }
 
+function save_advSettings() {
+  return esp_query({
+    type: 'POST',
+    url: '/api/ctrl/advSettings',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(jsonify_advCtrlSettings()),
+    success: null,
+    error: query_err
+  });
+}
+
+$('#adv_sett_save').click(function () {
+  show_spinner().then(function () {
+    save_advSettings().then(function () {
+      alert("Setting saved.");
+      hide_spinner(500);
+    });
+  });
+});
+
+
 // REMOTE LOG SETTINGS
 
-function esp_get_rl_settings(success_cb) {
-  $.ajax({
+function esp_get_rl_settings() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/ctrl/remoteLog',
+    url: '/api/ctrl/remoteLog',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_rLogSettings,
+    error: query_err
   });
+}
+
+function update_rLogSettings(data) {
+  if (data.enabled == 0)
+    $('#rl_enabled').val(0);
+  else
+    $('#rl_enabled').val(1);
+  $('#rl_host').val(data.host);
+  $('#rl_port').val(data.port);
+  $('#rl_path').val(data.path);
 }
 
 $('#rl_sett_refresh').click(function () {
-  update_rLogSettings();
-});
-
-$('#rl_sett_save').click(function () {
-  $.ajax({
-    type: 'POST',
-    url: esp8266.url + '/api/ctrl/remoteLog',
-    dataType: 'json',
-    contentType: 'application/json',
-    data: JSON.stringify(jsonify_rLogSettings()),
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function () {
-      alert("Settings saved.");
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+  show_spinner().then(function () {
+    esp_get_rl_settings().then(function () {
+      hide_spinner(500)
+    });
   });
 });
-
-function update_rLogSettings() {
-  esp_get_rl_settings(function (data) {
-    if (data.enabled == 0)
-      $('#rl_enabled').val(0);
-    else
-      $('#rl_enabled').val(1);
-    $('#rl_host').val(data.host);
-    $('#rl_port').val(data.port);
-    $('#rl_path').val(data.path);
-  });
-}
 
 function jsonify_rLogSettings() {
   var rl_settings = new Object;
@@ -361,10 +335,37 @@ function jsonify_rLogSettings() {
   return rl_settings;
 }
 
+function save_rl_settings() {
+  return esp_query({
+    type: 'POST',
+    url: '/api/ctrl/remoteLog',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(jsonify_rLogSettings()),
+    success: null,
+    error: query_err
+  });
+}
+
+$('#rl_sett_save').click(function () {
+  show_spinner().then(function () {
+    save_rl_settings().then(function () {
+      alert("Setting saved.");
+      hide_spinner(500);
+    });
+  });
+});
+
 // PROGRAMS
 
 $('#programs_refresh').click(function () {
-  update_programs();
+  show_spinner().then(function () {
+    esp_get_prg_list().then(function (data) {
+      update_programs(data).then(function () {
+        hide_spinner(500);
+      })
+    })
+  })
 });
 
 var program_id = -1;
@@ -377,8 +378,8 @@ $('#programs_new').click(function () {
 
 var prg_headings = [];
 
-function update_programs() {
-  esp_get_prg_list(function (data) {
+function update_programs(data) {
+  return new Promise(function (resolve) {
     prg_headings = data.prg_headings;
     $("#programs_table").empty();
     $("#programs_table").append('<thead><tr><th scope="col">Program</th><th scope="col" style="width:20%;">Actions</th></tr></thead><tbody>');
@@ -392,6 +393,7 @@ function update_programs() {
         ')"><i class="fa fa-trash-o"></i></button></td></tr>');
     }
     $("#programs_table").append('</tbody>');
+    resolve(data);
   });
 }
 
@@ -409,27 +411,33 @@ function modify_program(id) {
   load_program_modal(id);
 }
 
+// PROGRAM DELETE
+
 function esp_del_program(id) {
-  $.ajax({
+  return esp_query({
     type: 'DELETE',
-    url: esp8266.url + '/api/ctrl/program/' + id,
+    url: '/api/ctrl/program/' + id,
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 5000,
-    success: function (data) {
-      alert(data.msg);
-      update_program_list();
-      update_programs();
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: null,
+    error: query_err
   });
 }
 
 function delete_program(id) {
   if (confirm("Deleted programs cannot be recovered.\nConfirm delete..."))
-    esp_del_program(id);
+    show_spinner().then(function () {
+      esp_del_program(id).then(function () {
+        esp_get_prg_list().then(function (data) {
+          update_program_list(data).then(function (data) {
+            update_programs(data).then(function () {
+              esp_get_ctrl_settings().then(function () {
+                hide_spinner(500);
+              })
+            })
+          })
+        })
+      })
+    });
 }
 
 // PROGRAM EDIT
@@ -437,59 +445,75 @@ function delete_program(id) {
 var curr_program = new Object();
 
 function esp_get_program(id) {
-  $.ajax({
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/ctrl/program/' + id,
+    url: '/api/ctrl/program/' + id,
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
     success: function (data) {
       curr_program = data;
       curr_program.name = get_program_name(id);
       update_program_modal(false);
     },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    error: query_err
+  });
+}
+
+function esp_create_program() {
+  return esp_query({
+    type: 'POST',
+    url: '/api/ctrl/program',
+    dataType: 'json',
+    data: JSON.stringify(curr_program),
+    timeout: (5000 + curr_program.periods * 100),
+    success: null,
+    error: query_err
   });
 }
 
 function esp_post_program() {
-  $.ajax({
-    type: 'POST',
-    url: esp8266.url + '/api/ctrl/program',
+  show_spinner().then(function () {
+    esp_create_program().then(function (data) {
+      alert(data.msg);
+      esp_get_prg_list().then(function (data) {
+        update_program_list(data).then(function (data) {
+          update_programs(data).then(function () {
+            esp_get_ctrl_settings().then(function () {
+              $('#programModal').modal('hide');
+              hide_spinner(500);
+            })
+          })
+        })
+      })
+    })
+  });
+}
+
+function esp_modify_program(id) {
+  return esp_query({
+    type: 'PUT',
+    url: '/api/ctrl/program/' + id,
     dataType: 'json',
     data: JSON.stringify(curr_program),
-    crossDomain: esp8266.cors,
     timeout: (5000 + curr_program.periods * 100),
-    success: function (data) {
-      alert(data.msg);
-      update_program_list();
-      update_programs();
-      $('#programModal').modal('hide');
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: null,
+    error: query_err
   });
 }
 
 function esp_put_program(id) {
-  $.ajax({
-    type: 'PUT',
-    url: esp8266.url + '/api/ctrl/program/' + id,
-    dataType: 'json',
-    data: JSON.stringify(curr_program),
-    crossDomain: esp8266.cors,
-    timeout: (5000 + curr_program.periods * 100),
-    success: function (data) {
+  show_spinner().then(function () {
+    esp_modify_program(id).then(function (data) {
       alert(data.msg);
-      update_program_list();
-      update_programs();
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+      esp_get_prg_list().then(function (data) {
+        update_program_list(data).then(function (data) {
+          update_programs(data).then(function () {
+            esp_get_ctrl_settings().then(function () {
+              hide_spinner(500);
+            })
+          })
+        })
+      })
+    })
   });
 }
 

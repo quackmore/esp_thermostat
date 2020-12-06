@@ -29,12 +29,6 @@ struct activity_event
     uint32 timestamp;
     activity_event_t type;
     int value;
-    // union {
-    //     int temperature;
-    //     int heater_status;
-    //     int ctrl_mode;
-    //     int setpoint;
-    // };
 };
 
 void init_remote_logger(void);

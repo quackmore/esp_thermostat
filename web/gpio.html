@@ -1,0 +1,129 @@
+<div class="card-columns mt-3">
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-sign-in"></i> <i class="fa fa-sign-out"></i> GPIO</h5>
+          <button class="btn my-auto ml-auto" id="gpio_refresh">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div id="gpio_list">
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D1</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d1_cfg" onchange="gpio_cfg(1)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d1_value" onchange="gpio_set(1)">
+            <label class="custom-control-label" for="d1_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D2</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d2_cfg" onchange="gpio_cfg(2)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d2_value" onchange="gpio_set(2)">
+            <label class="custom-control-label" for="d2_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D3</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d3_cfg" onchange="gpio_cfg(3)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d3_value" onchange="gpio_set(3)">
+            <label class="custom-control-label" for="d3_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D4</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d4_cfg" onchange="gpio_cfg(4)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d4_value" onchange="gpio_set(4)">
+            <label class="custom-control-label" for="d4_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D5</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d5_cfg" onchange="gpio_cfg(5)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d5_value" onchange="gpio_set(5)">
+            <label class="custom-control-label" for="d5_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D6</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d6_cfg" onchange="gpio_cfg(6)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d6_value" onchange="gpio_set(6)">
+            <label class="custom-control-label" for="d6_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D7</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d7_cfg" onchange="gpio_cfg(7)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d7_value" onchange="gpio_set(7)">
+            <label class="custom-control-label" for="d7_value"></label>
+          </div>
+        </div>
+        <div class="row no-gutters">
+          <span class="my-auto float-left">D8</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <select class="form-control ml-auto my-auto border-0" id="d8_cfg" onchange="gpio_cfg(8)">
+              <option value="0"><span class="sr-only">Unprovisioned</span></option>
+              <option value="1"><span class="sr-only">Input</span></option>
+              <option value="2"><span class="sr-only">Output</span></option>
+            </select>
+          </div>
+          <div class="custom-control ml-auto my-auto custom-switch">
+            <input type="checkbox" class="custom-control-input" id="d8_value" onchange="gpio_set(8)">
+            <label class="custom-control-label" for="d8_value"></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="gpio.js"></script>

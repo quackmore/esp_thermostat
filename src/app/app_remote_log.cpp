@@ -289,6 +289,12 @@ void log_event(uint32 timestamp, activity_event_t type, int value)
     events[last_event_idx].timestamp = timestamp;
     events[last_event_idx].type = type;
     events[last_event_idx].value = value;
+    // raise an error when overwriting a not yet reported event
+    if (event_sent[last_event_idx] == false)
+    {
+        esp_diag.error(REMOTELOG_OVERWRITING_UNREPORTED_EVENT);
+        ERROR("log_event overwriting an not yet reported event");
+    }
     event_sent[last_event_idx] = false;
     // print_last_events();
 }
@@ -392,8 +398,8 @@ static void check_answer(void *param)
         }
         break;
     default:
-        esp_diag.error(REMOTELOG_CHECK_ANSWER_UNEXPECTED_CLIENT_STATUS, espclient->get_status());
-        ERROR("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
+        esp_diag.info(REMOTELOG_SERVER_DIDNT_ANSWER, espclient->get_status());
+        INFO("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
         break;
     }
@@ -449,8 +455,8 @@ static void post_info(void *param)
     break;
     default:
     {
-        esp_diag.error(REMOTELOG_POST_INFO_UNEXPECTED_CLIENT_STATUS, espclient->get_status());
-        ERROR("remote_log_post_info unexpected webclient status %d", espclient->get_status());
+        esp_diag.info(REMOTELOG_SERVER_NOT_AVAILABLE, espclient->get_status());
+        INFO("remote_log_post_info unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
     }
     break;
@@ -461,18 +467,19 @@ void send_events_to_external_host(void)
 {
     ALL("send_events_to_external_host");
 
-    if (remote_log_vars.enabled)
-    {
-        struct ip_addr host_ip;
-        atoipaddr(&host_ip, remote_log_vars.host);
+    if (!remote_log_vars.enabled)
+        return;
+    if (!Wifi::is_connected())
+        return;
+    struct ip_addr host_ip;
+    atoipaddr(&host_ip, remote_log_vars.host);
 
-        int event_idx = get_next_event_to_be_sent();
-        TRACE("send_events_to_external_host event to be sent: %d", event_idx);
-        if (event_idx < 0)
-            // there are no unsent events
-            return;
-        espclient->connect(host_ip, remote_log_vars.port, post_info, (void *)event_idx);
-    }
+    int event_idx = get_next_event_to_be_sent();
+    TRACE("send_events_to_external_host event to be sent: %d", event_idx);
+    if (event_idx < 0)
+        // there are no unsent events
+        return;
+    espclient->connect(host_ip, remote_log_vars.port, post_info, (void *)event_idx);
 }
 
 void print_last_events(void)

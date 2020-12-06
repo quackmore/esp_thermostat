@@ -1,43 +1,26 @@
 // events_journal.js
 
-// spinner while awaiting for page load
 $(document).ready(function () {
-  setTimeout(function () {
-    $('#awaiting').modal('hide');
-  }, 1000);
-  update_page();
+  esp_get_diagnostic_events()
+    .then(function (data) {
+      return Promise.resolve(update_diagnostic_events_table(data));
+    })
+    .then(function () {
+      hide_spinner(500)
+    });
 });
-
-function update_page() {
-  update_diagnostic_events();
-}
 
 // Events Journal
 
-function esp_get_diagnostic_events(success_cb) {
-  $.ajax({
+function esp_get_diagnostic_events() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/diagnostic',
+    url: '/api/diagnostic',
     dataType: 'json',
-    crossDomain: esp8266.cors,
     timeout: 5000,
-    success: function (data) {
-      success_cb(data);
-      setTimeout(function () {
-        $('.modal').modal('hide');
-      }, 1000);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-      setTimeout(function () {
-        $('.modal').modal('hide');
-      }, 1000);
-    }
+    success: null,
+    error: query_err
   });
-}
-
-function update_diagnostic_events() {
-  esp_get_diagnostic_events(update_diagnostic_events_table);
 }
 
 function update_diagnostic_events_table(data) {
@@ -67,25 +50,39 @@ function get_evnt_str(type) {
 }
 
 $('#events_refresh').on('click', function () {
-  $('#awaiting').modal('show');
-  update_diagnostic_events();
+  show_spinner()
+    .then(function () {
+      esp_get_diagnostic_events()
+        .then(function (data) {
+          return Promise.resolve(update_diagnostic_events_table(data));
+        })
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
 
 $('#events_ack').on('click', function () {
-  esp_ack_diagnostic_events(function (xhr) {
-    alert("" + JSON.parse(xhr.responseText).error.reason);
-  });
-  update_diagnostic_events();
+  show_spinner()
+    .then(function () {
+      esp_ack_diagnostic_events().then(function () {
+        esp_get_diagnostic_events()
+          .then(function (data) {
+            return Promise.resolve(update_diagnostic_events_table(data));
+          })
+          .then(function () {
+            hide_spinner(500)
+          });
+      });
+    });
 });
 
-function esp_ack_diagnostic_events(error_cb) {
-  $.ajax({
+function esp_ack_diagnostic_events() {
+  return esp_query({
     type: 'POST',
-    url: esp8266.url + '/api/diagnostic',
-    crossDomain: esp8266.cors,
+    url: '/api/diagnostic',
     timeout: 2000,
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: null,
+    error: query_err
   });
 }

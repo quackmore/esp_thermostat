@@ -27,7 +27,7 @@ public:
   ~File_to_json();
   bool exists(void);
   int find_string(const char *); // require string name of a json pair
-                           // return 0 on success !=0 on fail
+                                 // return 0 on success !=0 on fail
   char *get_value(void);
 };
 

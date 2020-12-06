@@ -1,333 +1,227 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <link rel="shortcut icon" type="image/png" href="https://img.icons8.com/ios/50/000000/thermometer-automation.png"/>
-  <meta name="description" content="">
-  <meta name="author" content="">
-  <title>ESP Thermostat</title>
-
-  <!-- Bootstrap core CSS 
-  <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet"> -->
-  <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"
-    integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
-    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-
-  <!-- Custom styles for this template -->
-  <link href="sidebar.css" rel="stylesheet">
-
-</head>
-
-<body>
-
-  <div class="d-flex" id="wrapper">
-
-    <!-- Sidebar -->
-    <div class="border-right side  bg-sidebar" id="sidebar-wrapper">
-      <div class="sidebar-heading">ESP THERMOSTAT</div>
-      <div class="list-group list-group-flush border-right">
-        <a href="index.html" class="list-group-item list-group-item-action bg-sidebar">Home</a>
-        <a href="history.html" class="list-group-item list-group-item-action bg-sidebar">Data History</a>
-        <a href="ctrl_settings.html" class="list-group-item list-group-item-action bg-sidebar">Thermostat settings</a>
-        <a href="events_journal.html" class="list-group-item list-group-item-action bg-sidebar">Events journal</a>
-        <a href="device.html" class="list-group-item list-group-item-action bg-sidebar">Device settings</a>
-        <a href="debug.html" class="list-group-item list-group-item-action bg-sidebar">Device Debug</a>
-        <a href="info.html" class="list-group-item list-group-item-action bg-sidebar">Info & Credits</a>
+<div class="card-columns mt-3">
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-refresh"></i> Reboot</h5>
+          <button class="btn btn-primary my-auto ml-auto" id="reboot"> Reboot </button>
+        </div>
       </div>
     </div>
-    <!-- /#sidebar-wrapper -->
-
-    <!-- Page Content ################################################################################-->
-    <div id="page-content-wrapper">
-
-      <nav class="navbar navbar-expand-lg navbar-dark border-bottom" id=content-navbar>
-        <span id="content-title">Device Debug</span>
-        <button class="btn ml-auto" id="menu-toggle">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-      </nav>
-
-      <div class="container-fluid">
-        <div class="card-columns mt-3">
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-refresh"></i> Reboot</h5>
-                  <button class="btn btn-primary my-auto ml-auto" id="reboot"> Reboot </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-info-circle"></i> Last Reboot</h5>
-                  <button class="btn my-auto ml-auto" id="last_rst_refresh">
-                    <i class="fa fa-refresh"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_date" class="col-form-label col-5 my-auto">Date</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_date" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_reason" class="col-form-label col-5 my-auto">Reason</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_reason" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_exccause" class="col-form-label col-5 my-auto">Exccause</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_exccause"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_epc1" class="col-form-label col-5 my-auto">Epc1</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_epc1" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_epc2" class="col-form-label col-5 my-auto">Epc2</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_epc2" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_epc3" class="col-form-label col-5 my-auto">Epc3</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_epc3" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_evcvaddr" class="col-form-label col-5 my-auto">Evcvaddr</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_evcvaddr"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_depc" class="col-form-label col-5 my-auto">Depc</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_depc" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="last_rst_sp" class="col-form-label col-5 my-auto">SP</label>
-                <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_sp" readonly>
-              </div>
-              <div class="form-group">
-                <label for="last_rst_spdump">Stack dump (flash addresses only)</label>
-                <textarea class="form-control text-monospace" id="last_rst_spdump" rows="8" small
-                  readonly></textarea>
-              </div>
-            </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-info-circle"></i> Memory Info</h5>
-                  <button class="btn my-auto ml-auto" id="meminfo_refresh">
-                    <i class="fa fa-refresh"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_stack_max" class="col-form-label col-6 my-auto">Stack MAX addr</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_stack_max"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_stack_min" class="col-form-label col-6 my-auto">Stack MIN addr</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_stack_min"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_heap_start" class="col-form-label col-6 my-auto">Heap start addr</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_start"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_heap_free" class="col-form-label col-6 my-auto">Heap free</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_free"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_heap_max_size" class="col-form-label col-6 my-auto">Heap MAX size</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_max_size"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_heap_min_size" class="col-form-label col-6 my-auto">Heap MIN size</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_min_size"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_heap_objs" class="col-form-label col-6 my-auto">Heap objects</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_objs"
-                  readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="meminfo_heap_max_objs" class="col-form-label col-6 my-auto">Heap MAX objects</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_max_objs"
-                  readonly>
-              </div>
-            </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-archive"></i> SPIFFS</h5>
-                  <button class="btn my-auto ml-auto" id="fsinfo_refresh">
-                    <i class="fa fa-refresh"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="fsinfo_size" class="col-form-label col-6 my-auto">FS size [bytes]</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="fsinfo_size" readonly>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="fsinfo_used" class="col-form-label col-6 my-auto">FS used [bytes]</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="fsinfo_used" readonly>
-              </div>
-              <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups" id="fs_buttons">
-                <div class="btn-group mr-2" role="group" aria-label="First group">
-                  <button type="button" class="btn btn-primary" id="fs_format">Format</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-file"></i> Files</h5>
-                  <button class="btn my-auto ml-auto" id="file_refresh">
-                    <i class="fa fa-refresh"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="small" id="file_list">
-                <div class="row no-gutters">
-                  <span class="my-auto float-left">filename</span>
-                  <div class="btn-group my-auto ml-auto" role="group">
-                    <button class="btn" disabled>18</button>
-                    <button class="btn" onclick="file_show(x);"><i class="fa fa-file-o"></i></button>
-                    <button class="btn" onclick="file_del(x);"><i class="fa fa-trash"></i></button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- File content modal -->
-          <div class="modal fade" id="file_modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true">
-            <div class="modal-dialog modal-xl" role="document">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title" id="file_name">...</h5>
-                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                  </button>
-                </div>
-                <div class="modal-body">
-                  <textarea class="form-control text-monospace" id="file_content" rows="10" readonly></textarea>
-                </div>
-                <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-upload"></i> File Upload</h5>
-                </div>
-              </div>
-              <div class="custom-file">
-                <input type="file" class="custom-file-input" id="file_choose">
-                <label class="custom-file-label" for="file_choose">Choose file</label>
-              </div>
-              <p></p>
-              <div>
-                <button class="btn btn-primary" type="button" id="file_upload">Upload</button>
-              </div>
-            </div>
-          </div>
-          <div class="card border-info">
-            <div class="card-body">
-              <div class="card-title">
-                <div class="row no-gutters">
-                  <h5 class="card-title my-auto"><i class="fa fa-download"></i> Memory Dump</h5>
-                  <button class="btn my-auto ml-auto" id="memhexdump_refresh">
-                    <i class="fa fa-refresh"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="memhexdump_start_addr" class="col-form-label col-6 my-auto">Start address</label>
-                <input type="text" class="form-control-sm col-6 ml-auto my-auto text-monospace" placeholder="3FFE8000"
-                  id="memhexdump_start_addr">
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="memhexdump_length" class="col-form-label col-6 my-auto">Length</label>
-                <input type="number" value="4" min="4" max="1024" step="4"
-                  class="form-control-sm col-6 ml-auto my-auto text-monospace" id="memhexdump_length">
-              </div>
-              <div class="form-group row no-gutters">
-                <label for="memhexdump_format" class="col-form-label col-6 my-auto">Format</label>
-                <select id="memhexdump_format" class="form-control-sm col-6 ml-auto my-auto border-0">
-                  <option value="0"><span class="sr-only">Hexadecimal</span></option>
-                  <option value="1"><span class="sr-only">Text</span></option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="memhexdump_content">Memory content</label>
-                <span class="text-monospace d-none" id="sample_text">0123456789</span>
-                <textarea class="form-control text-monospace" id="memhexdump_content" rows="8" small
-                  readonly></textarea>
-              </div>
-            </div>
+  </div>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-info-circle"></i> Last Reboot</h5>
+          <button class="btn my-auto ml-auto" id="last_rst_refresh">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_date" class="col-form-label col-5 my-auto">Date</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_date" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_reason" class="col-form-label col-5 my-auto">Reason</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_reason" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_exccause" class="col-form-label col-5 my-auto">Exccause</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_exccause" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_epc1" class="col-form-label col-5 my-auto">Epc1</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_epc1" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_epc2" class="col-form-label col-5 my-auto">Epc2</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_epc2" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_epc3" class="col-form-label col-5 my-auto">Epc3</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_epc3" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_evcvaddr" class="col-form-label col-5 my-auto">Evcvaddr</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_evcvaddr" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_depc" class="col-form-label col-5 my-auto">Depc</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_depc" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="last_rst_sp" class="col-form-label col-5 my-auto">SP</label>
+        <input type="text" class="form-control-sm col-7 ml-auto my-auto border-0" id="last_rst_sp" readonly>
+      </div>
+      <div class="form-group">
+        <label for="last_rst_spdump">Stack dump (flash addresses only)</label>
+        <textarea class="form-control text-monospace" id="last_rst_spdump" rows="8" small readonly></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-info-circle"></i> Memory Info</h5>
+          <button class="btn my-auto ml-auto" id="meminfo_refresh">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_stack_max" class="col-form-label col-6 my-auto">Stack MAX addr</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_stack_max" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_stack_min" class="col-form-label col-6 my-auto">Stack MIN addr</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_stack_min" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_heap_start" class="col-form-label col-6 my-auto">Heap start addr</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_start" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_heap_free" class="col-form-label col-6 my-auto">Heap free</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_free" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_heap_max_size" class="col-form-label col-6 my-auto">Heap MAX size</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_max_size" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_heap_min_size" class="col-form-label col-6 my-auto">Heap MIN size</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_min_size" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_heap_objs" class="col-form-label col-6 my-auto">Heap objects</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_objs" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="meminfo_heap_max_objs" class="col-form-label col-6 my-auto">Heap MAX objects</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="meminfo_heap_max_objs" readonly>
+      </div>
+    </div>
+  </div>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-archive"></i> SPIFFS</h5>
+          <button class="btn my-auto ml-auto" id="fsinfo_refresh">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="fsinfo_size" class="col-form-label col-6 my-auto">FS size [bytes]</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="fsinfo_size" readonly>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="fsinfo_used" class="col-form-label col-6 my-auto">FS used [bytes]</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto border-0" id="fsinfo_used" readonly>
+      </div>
+      <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups" id="fs_buttons">
+        <div class="btn-group mr-2" role="group" aria-label="First group">
+          <button type="button" class="btn btn-primary" id="fs_format">Format</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-file"></i> Files</h5>
+          <button class="btn my-auto ml-auto" id="file_refresh">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div class="small" id="file_list">
+        <div class="row no-gutters">
+          <span class="my-auto float-left">filename</span>
+          <div class="btn-group my-auto ml-auto" role="group">
+            <button class="btn" disabled>18</button>
+            <button class="btn" onclick="file_show(x);"><i class="fa fa-file-o"></i></button>
+            <button class="btn" onclick="file_del(x);"><i class="fa fa-trash"></i></button>
           </div>
         </div>
       </div>
     </div>
-    <!-- End Of Page Content #########################################################################-->
-
   </div>
-  <!-- /#wrapper -->
-  <!-- #spinner while awaiting for page load -->
-  <div class="modal fade" id="awaiting" data-backdrop="static" data-keyboard="false" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0" style="background-color: transparent;">
-        <span class="spinner-border mx-auto" role="status" style="width: 3rem; height: 3rem;"></span>
+  <!-- File content modal -->
+  <div class="modal fade" id="file_modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="file_name">...</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <textarea class="form-control text-monospace" id="file_content" rows="10" readonly></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>
-  <!-- /#spinner while awaiting for page load -->
-  <!-- Bootstrap core JavaScript -->
-  <!-- jQuery first, then Popper.js, then Bootstrap JS, then custom script -->
-  <!-- don't use slim if you need ajax -->
-  <script src="https://code.jquery.com/jquery-3.3.1.min.js"
-    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
-    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
-    crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
-    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
-    crossorigin="anonymous"></script>
-  <script type="text/javascript">
-    $('#awaiting').modal('show');
-  </script>
-  <script src="shared.js"></script>
-  <script src="debug.js"></script>
-  <!-- Menu Toggle Script -->
-  <script>
-    $("#menu-toggle").click(function (e) {
-      e.preventDefault();
-      $("#wrapper").toggleClass("toggled");
-    });
-  </script>
-</body>
-
-</html>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-upload"></i> File Upload</h5>
+        </div>
+      </div>
+      <div class="custom-file">
+        <input type="file" class="custom-file-input" id="file_choose">
+        <label class="custom-file-label" for="file_choose">Choose file</label>
+      </div>
+      <p></p>
+      <div>
+        <button class="btn btn-primary" type="button" id="file_upload">Upload</button>
+      </div>
+    </div>
+  </div>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-download"></i> Memory Dump</h5>
+          <button class="btn my-auto ml-auto" id="memhexdump_refresh">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="memhexdump_start_addr" class="col-form-label col-6 my-auto">Start address</label>
+        <input type="text" class="form-control-sm col-6 ml-auto my-auto text-monospace" placeholder="3FFE8000"
+          id="memhexdump_start_addr">
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="memhexdump_length" class="col-form-label col-6 my-auto">Length</label>
+        <input type="number" value="4" min="4" max="1024" step="4"
+          class="form-control-sm col-6 ml-auto my-auto text-monospace" id="memhexdump_length">
+      </div>
+      <div class="form-group row no-gutters">
+        <label for="memhexdump_format" class="col-form-label col-6 my-auto">Format</label>
+        <select id="memhexdump_format" class="form-control-sm col-6 ml-auto my-auto border-0">
+          <option value="0"><span class="sr-only">Hexadecimal</span></option>
+          <option value="1"><span class="sr-only">Text</span></option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="memhexdump_content">Memory content</label>
+        <span class="text-monospace d-none" id="sample_text">0123456789</span>
+        <textarea class="form-control text-monospace" id="memhexdump_content" rows="8" small readonly></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="debug.js"></script>

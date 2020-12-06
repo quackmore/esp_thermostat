@@ -2,35 +2,27 @@
 
 // spinner while awaiting for page load
 $(document).ready(function () {
-  setTimeout(function () {
-    $('#awaiting').modal('hide');
-  }, 1000);
-  update_page();
+  esp_get_history()
+    .then(function () {
+      hide_spinner(500)
+    });
 });
-
-function update_page() {
-  esp_get_history();
-}
 
 $('#history_refresh').on('click', function () {
-  $('#awaiting').modal('show');
-  setTimeout(function () {
-    $('#awaiting').modal('hide');
-  }, 1000);
-  update_page();
+  show_spinner()
+    .then(function () {
+      esp_get_history()
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
 
-function sort_data(array) {
-  return Promise.resolve(array.sort(function (a, b) { return (a.ts - b.ts); }));
-}
-
 function esp_get_history() {
-  $.ajax({
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/ctrl/log',
+    url: '/api/ctrl/log',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 5000,
     success: function (data) {
       Promise.resolve()
         .then(function () {
@@ -43,9 +35,7 @@ function esp_get_history() {
           createChart();
         })
     },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    error: query_err
   });
 }
 
@@ -174,6 +164,7 @@ function createChart() {
         data: temperatureData,
         pointRadius: 0,
         showLine: true,
+        steppedLine: true,
         fill: false,
         borderColor: "green",
         borderWidth: 1,
@@ -183,6 +174,8 @@ function createChart() {
         data: humidityData,
         pointRadius: 0,
         showLine: true,
+        steppedLine: true,
+        //        lineTension: 0,
         fill: false,
         borderColor: "blue",
         borderWidth: 1,

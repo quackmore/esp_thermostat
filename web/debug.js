@@ -1,58 +1,43 @@
 // debug.js
 
-// spinner while awaiting for page load
 $(document).ready(function () {
-  setTimeout(function () {
-    $('#awaiting').modal('hide');
-  }, 1000);
-  update_page();
-});
-
-function update_page() {
-  update_last_rst();
-  update_meminfo();
   file_upload_update();
-  setTimeout(function () {
-    update_fsinfo();
-    update_file_list();
-  }, 250);
-}
+  esp_get_last_rst().then(function () {
+    esp_get_meminfo().then(function () {
+      esp_get_fsinfo().then(function () {
+        esp_get_file().then(function () {
+          hide_spinner(500)
+        });
+      });
+    });
+  });
+});
 
 // reboot
 
 $('#reboot').on('click', function () {
   if (confirm("Confirm device reboot...")) {
-    $.ajax({
+    esp_query({
       type: 'POST',
-      url: esp8266.url + '/api/reboot',
+      url: '/api/reboot',
       dataType: 'json',
-      crossDomain: esp8266.cors,
-      timeout: 2000,
       success: function (data) {
         alert("" + data.msg);
       },
-      error: function (jqXHR, textStatus, errorThrown) {
-        ajax_error(jqXHR, textStatus, errorThrown);
-      }
-    })
+      error: query_err
+    });
   }
 });
 
 // last reboot
 
-function esp_get_last_rst(success_cb) {
-  $.ajax({
+function esp_get_last_rst() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/debug/lastReset',
+    url: '/api/debug/lastReset',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_last_rst,
+    error: query_err
   });
 }
 
@@ -65,202 +50,184 @@ function formatStackDump(data) {
   return stackDump;
 }
 
-function update_last_rst() {
-  esp_get_last_rst(function (data) {
-    $("#last_rst_date").val(data.date);
-    $("#last_rst_reason").val(data.reason);
-    $("#last_rst_exccause").val(data.exccause);
-    $("#last_rst_epc1").val(data.epc1);
-    $("#last_rst_epc2").val(data.epc2);
-    $("#last_rst_epc3").val(data.epc3);
-    $("#last_rst_evcvaddr").val(data.evcvaddr);
-    $("#last_rst_depc").val(data.depc);
-    $("#last_rst_sp").val(data.sp);
-    $("#last_rst_spdump").val(formatStackDump(data));
-  });
+function update_last_rst(data) {
+  $("#last_rst_date").val(data.date);
+  $("#last_rst_reason").val(data.reason);
+  $("#last_rst_exccause").val(data.exccause);
+  $("#last_rst_epc1").val(data.epc1);
+  $("#last_rst_epc2").val(data.epc2);
+  $("#last_rst_epc3").val(data.epc3);
+  $("#last_rst_evcvaddr").val(data.evcvaddr);
+  $("#last_rst_depc").val(data.depc);
+  $("#last_rst_sp").val(data.sp);
+  $("#last_rst_spdump").val(formatStackDump(data));
 }
 
-$('#last_rst_refresh').on('click', function (e) {
-  update_last_rst();
+$('#last_rst_refresh').on('click', function () {
+  show_spinner()
+    .then(function () {
+      esp_get_last_rst()
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
 
 // meminfo
 
-function esp_get_meminfo(success_cb) {
-  $.ajax({
+function esp_get_meminfo() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/debug/memInfo',
+    url: '/api/debug/memInfo',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_meminfo,
+    error: query_err
   });
 }
 
-function update_meminfo() {
-  esp_get_meminfo(function (data) {
-    $("#meminfo_stack_max").val(data.stack_max_addr);
-    $("#meminfo_stack_min").val(data.stack_min_addr);
-    $("#meminfo_heap_start").val(data.heap_start_addr);
-    $("#meminfo_heap_free").val(data.heap_free_size);
-    $("#meminfo_heap_max_size").val(data.heap_max_size);
-    $("#meminfo_heap_min_size").val(data.heap_min_size);
-    $("#meminfo_heap_objs").val(data.heap_objs);
-    $("#meminfo_heap_max_objs").val(data.heap_max_objs);
-  });
+function update_meminfo(data) {
+  $("#meminfo_stack_max").val(data.stack_max_addr);
+  $("#meminfo_stack_min").val(data.stack_min_addr);
+  $("#meminfo_heap_start").val(data.heap_start_addr);
+  $("#meminfo_heap_free").val(data.heap_free_size);
+  $("#meminfo_heap_max_size").val(data.heap_max_size);
+  $("#meminfo_heap_min_size").val(data.heap_min_size);
+  $("#meminfo_heap_objs").val(data.heap_objs);
+  $("#meminfo_heap_max_objs").val(data.heap_max_objs);
 }
 
-$('#meminfo_refresh').on('click', function (e) {
-  update_meminfo();
+$('#meminfo_refresh').on('click', function () {
+  show_spinner()
+    .then(function () {
+      esp_get_meminfo()
+      .then(function () {
+        hide_spinner(500)
+      });
+  });
 });
 
 // SPIFFS
 
-function esp_get_fsinfo(success_cb) {
-  $.ajax({
+function esp_get_fsinfo() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/fs',
+    url: '/api/fs',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_fsinfo,
+    error: query_err
   });
 }
 
-function update_fsinfo() {
-  esp_get_fsinfo(function (data) {
-    $("#fsinfo_size").val(data.file_system_size);
-    $("#fsinfo_used").val(data.file_system_used_size);
-  });
+function update_fsinfo(data) {
+  $("#fsinfo_size").val(data.file_system_size);
+  $("#fsinfo_used").val(data.file_system_used_size);
 }
 
 $('#fsinfo_refresh').on('click', function () {
-  update_fsinfo();
+  show_spinner()
+    .then(function () {
+      esp_get_fsinfo()
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
 
 $('#fs_format').on('click', function () {
   if (confirm("File system content will be lost.\nConfirm format...")) {
-    $.ajax({
+    return esp_query({
       type: 'POST',
-      url: esp8266.url + '/api/fs/format',
+      url: '/api/fs/format',
       dataType: 'json',
-      crossDomain: esp8266.cors,
-      timeout: 2000,
       success: function (data) {
         alert("" + data.msg);
       },
-      error: function (jqXHR, textStatus, errorThrown) {
-        ajax_error(jqXHR, textStatus, errorThrown);
-      }
-    })
+      error: query_err
+    });
   }
 });
 
 // Files
 
-function esp_get_file(success_cb) {
-  $.ajax({
+function esp_get_file() {
+  return esp_query({
     type: 'GET',
-    url: esp8266.url + '/api/file',
+    url: '/api/file',
     dataType: 'json',
-    crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_file_list,
+    error: query_err
   });
 }
 
-function update_file_list() {
-  esp_get_file(function (data) {
-    data.files.sort(function (a, b) {
-      var nameA = a.name.toUpperCase();
-      var nameB = b.name.toUpperCase();
-      if (nameA < nameB) {
-        return -1;
-      }
-      if (nameA > nameB) {
-        return 1;
-      }
-      return 0;
-    });
-    var file_list_str = "";
-    for (var idx = 0; idx < data.files.length; idx++) {
-      file_list_str += '<div class="row no-gutters"><span class="my-auto float-left">';
-      file_list_str += data.files[idx].name;
-      file_list_str += '</span><div class="btn-group my-auto ml-auto" role="group"><span class="my-auto">';
-      file_list_str += data.files[idx].size;
-      file_list_str += '</span><button class="btn" onclick="file_show(\x27';
-      file_list_str += data.files[idx].name;
-      file_list_str += '\x27,';
-      file_list_str += data.files[idx].size;
-      file_list_str += ');"><i class="fa fa-file-o"></i></button><button class="btn" onclick="file_del(\x27';
-      file_list_str += data.files[idx].name;
-      file_list_str += '\x27);"><i class="fa fa-trash"></i></button></div></div>';
+function update_file_list(data) {
+  data.files.sort(function (a, b) {
+    var nameA = a.name.toUpperCase();
+    var nameB = b.name.toUpperCase();
+    if (nameA < nameB) {
+      return -1;
     }
-    $("#file_list").html(file_list_str);
+    if (nameA > nameB) {
+      return 1;
+    }
+    return 0;
   });
+  var file_list_str = "";
+  for (var idx = 0; idx < data.files.length; idx++) {
+    file_list_str += '<div class="row no-gutters"><span class="my-auto float-left">';
+    file_list_str += data.files[idx].name;
+    file_list_str += '</span><div class="btn-group my-auto ml-auto" role="group"><span class="my-auto">';
+    file_list_str += data.files[idx].size;
+    file_list_str += '</span><button class="btn" onclick="file_show(\x27';
+    file_list_str += data.files[idx].name;
+    file_list_str += '\x27,';
+    file_list_str += data.files[idx].size;
+    file_list_str += ');"><i class="fa fa-file-o"></i></button><button class="btn" onclick="file_del(\x27';
+    file_list_str += data.files[idx].name;
+    file_list_str += '\x27);"><i class="fa fa-trash"></i></button></div></div>';
+  }
+  $("#file_list").html(file_list_str);
 }
 
 $('#file_refresh').on('click', function () {
-  update_file_list();
+  show_spinner()
+    .then(function () {
+      esp_get_file()
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
 
 function file_show(file, filesize) {
-  $('#awaiting').modal('show');
-  var timeout_value = filesize / 8 + 3000;
-  console.log(timeout_value);
-  $.ajax({
-    type: 'GET',
-    url: esp8266.url + '/api/file/' + file,
-    crossDomain: esp8266.cors,
-    timeout: timeout_value,
-    success: function (data) {
-      setTimeout(function () {
-        $('#awaiting').modal('hide');
-      }, 1000);
-      $('#file_name').text(file);
-      $('#file_content').val(data);
-      $('#file_modal').modal('show');
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      setTimeout(function () {
-        $('#awaiting').modal('hide');
-      }, 1000);
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
-  })
+  show_spinner()
+    .then(function () {
+      var timeout_value = filesize / 8 + 3000;
+      return esp_query({
+        type: 'GET',
+        url: '/api/file/' + file,
+        timeout: timeout_value,
+        success: function (data) {
+          hide_spinner(500);
+          $('#file_name').text(file);
+          $('#file_content').val(data);
+          $('#file_modal').modal('show');
+        },
+        error: query_err
+      });
+    });
 }
 
 function file_del(file) {
   if (confirm("Deleted files cannot be recovered.\nConfirm delete...")) {
-    $.ajax({
+    return esp_query({
       type: 'DELETE',
-      url: esp8266.url + '/api/file/' + file,
-      crossDomain: esp8266.cors,
-      timeout: 2000,
-      success: function (data) {
-        // alert("" + data.msg);
-        update_file_list();
-      },
-      error: function (jqXHR, textStatus, errorThrown) {
-        ajax_error(jqXHR, textStatus, errorThrown);
-        update_file_list();
+      url: '/api/file/' + file,
+      success: esp_get_file,
+      error: function (jqXHR, textStatus) {
+        query_err(jqXHR, textStatus);
+        esp_get_file();
       }
-    })
+    });
   }
 }
 
@@ -284,42 +251,37 @@ $("#file_upload").on("click", function () {
   var fr = new FileReader();
   fr.readAsArrayBuffer(file);
   fr.onload = function () {
-    $('#awaiting').modal('show');
-    var buffer = new Uint8Array(fr.result);
-    var end;
-    if (buffer.length < 1500) {
-      end = buffer.length;
-    }
-    else {
-      end = 1500;
-    }
-    $.ajax({
-      type: 'POST',
-      url: esp8266.url + '/api/file/' + $("#file_choose").val().split("\\").pop(),
-      contentType: 'application/octet-stream',
-      data: buffer.slice(0, end),
-      processData: false,
-      crossDomain: esp8266.cors,
-      timeout: 2000,
-      success: function (data) {
+    show_spinner()
+      .then(function () {
+        var buffer = new Uint8Array(fr.result);
+        var end;
         if (buffer.length < 1500) {
-          setTimeout(function () {
-            $('#awaiting').modal('hide');
-          }, 1000);
-          update_file_list();
+          end = buffer.length;
         }
         else {
-          upload_remaining(buffer, 1500);
+          end = 1500;
         }
-      },
-      error: function (jqXHR, textStatus, errorThrown) {
-        ajax_error(jqXHR, textStatus, errorThrown);
-        setTimeout(function () {
-          $('#awaiting').modal('hide');
-        }, 1000);
-        update_file_list();
-      }
-    });
+        return esp_query({
+          type: 'POST',
+          url: '/api/file/' + $("#file_choose").val().split("\\").pop(),
+          contentType: 'application/octet-stream',
+          data: buffer.slice(0, end),
+          processData: false,
+          success: function (data) {
+            if (buffer.length < 1500) {
+              hide_spinner(1000);
+              esp_get_file();
+            }
+            else {
+              upload_remaining(buffer, 1500);
+            }
+          },
+          error: function (jqXHR, textStatus) {
+            query_err(jqXHR, textStatus);
+            esp_get_file();
+          }
+        });
+      });
   }
 });
 
@@ -331,32 +293,25 @@ function upload_remaining(buffer, starting_point) {
   else {
     end = starting_point + 1500;
   }
-  $.ajax({
+  return esp_query({
     type: 'PUT',
-    url: esp8266.url + '/api/file/' + $("#file_choose").val().split("\\").pop(),
+    url: '/api/file/' + $("#file_choose").val().split("\\").pop(),
     contentType: 'application/octet-stream',
     data: buffer.slice(starting_point, end),
     processData: false,
-    crossDomain: esp8266.cors,
-    timeout: 2000,
     success: function (data) {
       if ((buffer.length - starting_point) < 1500) {
-        setTimeout(function () {
-          $('#awaiting').modal('hide');
-        }, 1000);
-        update_file_list();
+        hide_spinner(1000);
+        esp_get_file();
       }
       else {
         // setTimeout(upload_remaining(buffer, (starting_point + 1500)), 2000);
         upload_remaining(buffer, (starting_point + 1500));
       }
     },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-      setTimeout(function () {
-        $('#awaiting').modal('hide');
-      }, 1000);
-      update_file_list();
+    error: function (jqXHR, textStatus) {
+      query_err(jqXHR, textStatus);
+      esp_get_file();
     }
   });
 }
@@ -376,21 +331,16 @@ $('#memhexdump_length').on('change', function () {
   }
 });
 
-function esp_get_memhexdump(success_cb) {
-  $.ajax({
+function esp_get_memhexdump() {
+  return esp_query({
     type: 'POST',
-    url: esp8266.url + '/api/debug/hexMemDump',
+    url: '/api/debug/hexMemDump',
     dataType: 'json',
     contentType: 'application/json',
     data: JSON.stringify({ address: $('#memhexdump_start_addr').val(), length: Number($('#memhexdump_length').val()) }),
     crossDomain: esp8266.cors,
-    timeout: 2000,
-    success: function (data) {
-      success_cb(data);
-    },
-    error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown);
-    }
+    success: update_memhexdump,
+    error: query_err
   });
 }
 
@@ -458,15 +408,21 @@ function format_chars(unformatted_str) {
   return formatted_str;
 }
 
-function update_memhexdump() {
-  esp_get_memhexdump(function (data) {
-    if ($('#memhexdump_format').val() == 1)
-      $("#memhexdump_content").val(format_chars(data.content));
-    else
-      $("#memhexdump_content").val(format_hex(data.content));
-  });
+function update_memhexdump(data) {
+  if ($('#memhexdump_format').val() == 1)
+    $("#memhexdump_content").val(format_chars(data.content));
+  else
+    $("#memhexdump_content").val(format_hex(data.content));
 }
 
 $('#memhexdump_refresh').on('click', function () {
-  update_memhexdump();
+  if ($('#memhexdump_start_addr').val() == "")
+    return;
+  show_spinner()
+    .then(function () {
+      esp_get_memhexdump()
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
