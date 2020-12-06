@@ -27,27 +27,33 @@ non sequential script loading could generate errors
 
 <script>
   jQuery.getScript("https://cdn.jsdelivr.net/npm/moment@2.27.0/moment.min.js", function (responseText, textStatus, xhr) {
-    if (textStatus != "success")
+    if (textStatus != "success") {
       load_err(responseText, textStatus, xhr);
-    else
+    } else {
       jQuery.getScript("https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js", function (responseText, textStatus, xhr) {
-        if (textStatus != "success")
+        if (textStatus != "success") {
           load_err(responseText, textStatus, xhr);
-        else
+        }
+        else {
           jQuery.getScript("https://cdn.jsdelivr.net/npm/hammerjs@2.0.8", function (responseText, textStatus, xhr) {
-            if (textStatus != "success")
+            if (textStatus != "success") {
               load_err(responseText, textStatus, xhr);
-            else
+            } else {
               jQuery.getScript("https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7", function (responseText, textStatus, xhr) {
-                if (textStatus != "success")
+                if (textStatus != "success") {
                   load_err(responseText, textStatus, xhr);
-                else
+                } else {
+                  $.ajaxSetup({ cache: true });
                   jQuery.getScript("history.js", function (responseText, textStatus, xhr) {
                     if (textStatus != "success")
                       load_err(responseText, textStatus, xhr);
                   });
+                }
               });
+            }
           });
+        }
       });
+    }
   });
 </script>
