@@ -96,10 +96,8 @@ void ctrl_off(void)
 {
     // log ctrl mode changes
     if (ctrl.mode != MODE_OFF)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, mode_change, MODE_OFF);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), mode_change, MODE_OFF);
     ctrl.mode = MODE_OFF;
     if (heater_vars.heater_on)
         switch_off_heater();
@@ -114,10 +112,8 @@ void ctrl_off(void)
 void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after)
 {
     if (ctrl.mode != MODE_MANUAL)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, mode_change, MODE_MANUAL);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), mode_change, MODE_MANUAL);
     ctrl.mode = MODE_MANUAL;
     ctrl.heater_on_period = heater_on_period;
     ctrl.heater_off_period = heater_off_period;
@@ -132,17 +128,13 @@ void ctrl_auto(int set_point, int stop_after)
 {
     // log ctrl mode changes
     if (ctrl.mode != MODE_AUTO)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, mode_change, MODE_AUTO);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), mode_change, MODE_AUTO);
     ctrl.mode = MODE_AUTO;
     // log setpoint changes
     if (ctrl.setpoint != set_point)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, setpoint_change, set_point);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), setpoint_change, set_point);
     ctrl.setpoint = set_point;
     ctrl.stop_after = stop_after;
     ctrl.started_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
@@ -169,10 +161,8 @@ void ctrl_program(int id)
     // a program was found!!
     // log ctrl mode changes
     if (ctrl.mode != MODE_PROGRAM)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, mode_change, MODE_PROGRAM);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), mode_change, MODE_PROGRAM);
     ctrl.mode = MODE_PROGRAM;
     // default set-point
     ctrl.setpoint = ctrl.program->min_temp;
@@ -1144,7 +1134,7 @@ static void update_setpoint(void)
     // and log setpoint changes
     if (ctrl.setpoint != set_point)
     {
-        log_event(current_time->timestamp, setpoint_change, set_point);
+        log_event(esp_time.get_timestamp(), setpoint_change, set_point);
         DEBUG("CTRL set point changed to %d", set_point);
     }
     ctrl.setpoint = set_point;

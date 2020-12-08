@@ -51,10 +51,8 @@ void heater_start(void)
     // log heater status change
     heater_switch_on();
     if (heater_on != true)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, heater_change, true);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), heater_change, true);
     heater_on = true;
 }
 
@@ -71,10 +69,8 @@ void heater_stop(void)
     // log heater status change
     heater_switch_off();
     if (heater_on != false)
-    {
-        struct date *current_time = get_current_time();
-        log_event(current_time->timestamp, heater_change, false);
-    }
+        // can be manually set, use actual time
+        log_event(esp_time.get_timestamp(), heater_change, false);
     heater_on = false;
 }
 
