@@ -357,6 +357,51 @@ static int get_next_event_to_be_sent(void)
     return event_idx;
 }
 
+// remote_host_errors
+
+typedef enum
+{
+    success = 0,
+    host_not_reachable,
+    host_bad_answer,
+    host_req_error
+} comm_res_type;
+
+static void comm_outcome(comm_res_type result)
+{
+    static int comm_error_counter = 0;
+
+    switch (result)
+    {
+    case success:
+        if (comm_error_counter > 0)
+        {
+            esp_diag.info(REMOTELOG_SERVER_AVAILABLE, comm_error_counter);
+        }
+        comm_error_counter = 0;
+        break;
+    case host_not_reachable:
+        if (comm_error_counter == 0)
+            esp_diag.info(REMOTELOG_SERVER_NOT_AVAILABLE, espclient->get_status());
+        comm_error_counter++;
+        INFO("remote_log_post_info unexpected webclient status %d", espclient->get_status());
+        espclient->disconnect(NULL, NULL);
+        break;
+    case host_bad_answer:
+        esp_diag.error(REMOTELOG_CHECK_ANSWER_UNEXPECTED_HOST_ANSWER, espclient->parsed_response->http_code);
+        ERROR("remote_log_check_answer unexpected host answer %d, %s", espclient->parsed_response->http_code, espclient->parsed_response->body);
+        espclient->disconnect(NULL, NULL);
+        break;
+    case host_req_error:
+        esp_diag.info(REMOTELOG_SERVER_DIDNT_ANSWER, espclient->get_status());
+        INFO("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
+        espclient->disconnect(NULL, NULL);
+        break;
+    default:
+        break;
+    }
+}
+
 static void post_info(void *param);
 
 static void check_answer(void *param)
@@ -368,9 +413,7 @@ static void check_answer(void *param)
         if (espclient->parsed_response->http_code != HTTP_OK)
         {
             // POST failed
-            esp_diag.error(REMOTELOG_CHECK_ANSWER_UNEXPECTED_HOST_ANSWER, espclient->parsed_response->http_code);
-            ERROR("remote_log_check_answer unexpected host answer %d, %s", espclient->parsed_response->http_code, espclient->parsed_response->body);
-            espclient->disconnect(NULL, NULL);
+            comm_outcome(host_bad_answer);
         }
         else
         {
@@ -398,9 +441,7 @@ static void check_answer(void *param)
         }
         break;
     default:
-        esp_diag.info(REMOTELOG_SERVER_DIDNT_ANSWER, espclient->get_status());
-        INFO("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
-        espclient->disconnect(NULL, NULL);
+        comm_outcome(host_req_error);
         break;
     }
 }
@@ -413,6 +454,8 @@ static void post_info(void *param)
     case WEBCLNT_CONNECTED:
     case WEBCLNT_RESPONSE_READY:
     {
+        comm_outcome(success);
+
         int event_idx = (int)param;
 
         // {"timestamp":4294967295,"type":1,"value":-1234}
@@ -431,7 +474,6 @@ static void post_info(void *param)
         {
             esp_diag.error(REMOTELOG_POST_INFO_HEAP_EXHAUSTED, msg_len);
             ERROR("remote_log_post_info - heap exausted [%d]", msg_len);
-            esp_ota.set_status(OTA_FAILED);
             espclient->disconnect(NULL, NULL);
             break;
         }
@@ -454,12 +496,8 @@ static void post_info(void *param)
     }
     break;
     default:
-    {
-        esp_diag.info(REMOTELOG_SERVER_NOT_AVAILABLE, espclient->get_status());
-        INFO("remote_log_post_info unexpected webclient status %d", espclient->get_status());
-        espclient->disconnect(NULL, NULL);
-    }
-    break;
+        comm_outcome(host_not_reachable);
+        break;
     }
 }
 
