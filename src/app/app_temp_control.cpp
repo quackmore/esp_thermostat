@@ -28,35 +28,7 @@ extern "C"
 #include "app_temp_control.hpp"
 #include "app_temp_ctrl_program.hpp"
 
-//
-// heater mngmt
-//
-
-static struct _heater_vars
-{
-    uint32 last_heater_on;
-    uint32 last_heater_off;
-} heater_vars;
-
-void switch_on_heater(void)
-{
-    heater_vars.last_heater_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
-    heater_start();
-    DEBUG("TEMP CTRL -> heater on");
-}
-
-void switch_off_heater(void)
-{
-    heater_vars.last_heater_off = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
-    heater_stop();
-    DEBUG("TEMP CTRL -> heater off");
-}
-
-//
-// CTRL
-//
-
-static void save_cfg(void);
+// CTRL vars
 
 static struct _ctrl_vars
 {
@@ -68,7 +40,53 @@ static struct _ctrl_vars
     uint32 started_on;     // the timestamp when ctrl was started
     int stop_after;        // minutes
     int setpoint;          //
+    bool ctrl_paused;      // temperature control is always active
+                           // but when (ctrl_paused == true)
+                           // heater is always off
 } ctrl;
+
+//
+// heater mngmt
+//
+
+static struct _heater_vars
+{
+    bool heater_on;
+    uint32 last_heater_on;
+    uint32 last_heater_off;
+} heater_vars;
+
+void switch_on_heater(void)
+{
+    // set local status on
+    heater_vars.heater_on = true;
+    heater_vars.last_heater_on = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
+    DEBUG("TEMP CTRL -> heater on");
+    // set real status depending on ctrl_paused
+    if (!ctrl.ctrl_paused)
+    {
+        heater_start();
+    }
+    else
+    {
+        DEBUG("TEMP CTRL -> heater CTRL is suspended");
+    }
+    
+}
+
+void switch_off_heater(void)
+{
+    heater_vars.heater_on = false;
+    heater_vars.last_heater_off = (get_current_time()->timestamp / 60) * 60; // rounding to previous minute
+    heater_stop();
+    DEBUG("TEMP CTRL -> heater off");
+}
+
+//
+// CTRL
+//
+
+static void save_cfg(void);
 
 //
 // MANUAL CTRL
@@ -83,7 +101,7 @@ void ctrl_off(void)
         log_event(current_time->timestamp, mode_change, MODE_OFF);
     }
     ctrl.mode = MODE_OFF;
-    if (is_heater_on())
+    if (heater_vars.heater_on)
         switch_off_heater();
     uint32 time = get_current_time()->timestamp;
     DEBUG("TEMP CTRL -> OFF [%d] %s", time, esp_time.get_timestr(time));
@@ -144,7 +162,7 @@ void ctrl_program(int id)
         // didn't find the program
         esp_diag.error(TEMP_CTRL_PROGRAM_NOT_FOUND, id);
         ERROR("ctrl_program cannot find program %d", id);
-        if(ctrl.mode == MODE_PROGRAM)
+        if (ctrl.mode == MODE_PROGRAM)
             ctrl_off();
         return;
     }
@@ -192,8 +210,8 @@ static void compute_ctrl_vars(void)
         // d e(t)/dt
         // on valid temperature reading calculate error derivative
         // otherwise go on with previous values
-        if (get_temp(1) != INVALID_TEMP)
-            de_dt = current_temp - get_temp(1);
+        if (get_temp(adv_settings.kd_dt) != INVALID_TEMP)
+            de_dt = current_temp - get_temp(adv_settings.kd_dt);
         // Integral(t-60,t)(e(x) dx)
         i_e = 0;
         int cur_val;
@@ -251,7 +269,7 @@ static void compute_ctrl_vars(void)
     struct date *current_time = get_current_time();
     uint32 heater_off_since = current_time->timestamp - heater_vars.last_heater_off;
     // the heater is off and was off since at least COLD_HEATER minutes
-    if (!is_heater_on() && (heater_off_since > (adv_settings.heater_cold * 60)))
+    if (!heater_vars.heater_on && (heater_off_since > (adv_settings.heater_cold * 60)))
     {
         warm_up_started_on = current_time->timestamp;
     }
@@ -569,6 +587,7 @@ static bool restore_adv_cfg(void)
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
     //   ki: int,             6 digit (5 digit and sign)
+    //   kd_dt: int,          6 digit
     //   u_max: int,          6 digit (5 digit and sign)
     //   heater_on_min: int,  5 digit
     //   heater_on_max: int,  5 digit
@@ -590,7 +609,7 @@ static bool restore_adv_cfg(void)
     // kd
     if (cfgfile.find_string(f_str("kd")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"kd\"");
         return false;
     }
@@ -598,15 +617,23 @@ static bool restore_adv_cfg(void)
     // ki
     if (cfgfile.find_string(f_str("ki")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"ki\"");
         return false;
     }
     adv_settings.ki = atoi(cfgfile.get_value());
+    // kd_dt
+    if (cfgfile.find_string(f_str("kd_dt")))
+    {
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
+        ERROR("temp_control_restore_adv_cfg cannot find \"kd_dt\"");
+        return false;
+    }
+    adv_settings.kd_dt = atoi(cfgfile.get_value());
     // u_max
     if (cfgfile.find_string(f_str("u_max")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"u_max\"");
         return false;
     }
@@ -614,7 +641,7 @@ static bool restore_adv_cfg(void)
     // heater_on_min
     if (cfgfile.find_string(f_str("heater_on_min")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"heater_on_min\"");
         return false;
     }
@@ -622,7 +649,7 @@ static bool restore_adv_cfg(void)
     // heater_on_max
     if (cfgfile.find_string(f_str("heater_on_max")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"heater_on_max\"");
         return false;
     }
@@ -630,7 +657,7 @@ static bool restore_adv_cfg(void)
     // heater_on_off
     if (cfgfile.find_string(f_str("heater_on_off")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"heater_on_off\"");
         return false;
     }
@@ -638,7 +665,7 @@ static bool restore_adv_cfg(void)
     // heater_cold
     if (cfgfile.find_string(f_str("heater_cold")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"heater_cold\"");
         return false;
     }
@@ -646,7 +673,7 @@ static bool restore_adv_cfg(void)
     // warm_up_period
     if (cfgfile.find_string(f_str("warm_up_period")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"warm_up_period\"");
         return false;
     }
@@ -654,7 +681,7 @@ static bool restore_adv_cfg(void)
     // wup_heater_on
     if (cfgfile.find_string(f_str("wup_heater_on")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"wup_heater_on\"");
         return false;
     }
@@ -662,7 +689,7 @@ static bool restore_adv_cfg(void)
     // wup_heater_off
     if (cfgfile.find_string(f_str("wup_heater_off")))
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_FS_NOT_AVAILABLE);
+        esp_diag.error(TEMP_CTRL_RESTORE_ADV_CFG_INCOMPLETE);
         ERROR("temp_control_restore_adv_cfg cannot find \"wup_heater_off\"");
         return false;
     }
@@ -686,6 +713,7 @@ static bool saved_adv_cfg_not_updated(void)
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
     //   ki: int,             6 digit (5 digit and sign)
+    //   kd_dt: int,          6 digit
     //   u_max: int,          6 digit (5 digit and sign)
     //   heater_on_min: int,  5 digit
     //   heater_on_max: int,  5 digit
@@ -722,6 +750,15 @@ static bool saved_adv_cfg_not_updated(void)
         return true;
     }
     if (adv_settings.ki != atoi(cfgfile.get_value()))
+        return true;
+    // kd_dt
+    if (cfgfile.find_string(f_str("kd_dt")))
+    {
+        esp_diag.error(TEMP_CTRL_SAVED_ADV_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("temp_control_saved_adv_cfg_not_updated cannot find \"kd_dt\"");
+        return true;
+    }
+    if (adv_settings.kd_dt != atoi(cfgfile.get_value()))
         return true;
     // u_max
     if (cfgfile.find_string(f_str("u_max")))
@@ -838,6 +875,7 @@ static void save_adv_cfg(void)
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
     //   ki: int,             6 digit (5 digit and sign)
+    //   kd_dt: int,          6 digit
     //   u_max: int,          6 digit (5 digit and sign)
     //   heater_on_min: int,  5 digit
     //   heater_on_max: int,  5 digit
@@ -848,30 +886,32 @@ static void save_adv_cfg(void)
     //   wup_heater_off: int  5 digit
     // }
 
-    // {"kp": ,"kd": ,"ki": ,"u_max": ,"heater_on_min": ,"heater_on_max": ,"heater_on_off": ,"heater_cold": ,"warm_up_period": ,"wup_heater_on": ,"wup_heater_off": }
-    char buffer[(158 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1)];
+    // {"kp":,"kd":,"ki":,"kd_dt":,"u_max":,"heater_on_min":,"heater_on_max":,"heater_on_off":,"heater_cold":,"warm_up_period":,"wup_heater_on":,"wup_heater_off":}
+    char buffer[(156 + 6 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1)];
     fs_sprintf(buffer,
-               "{\"kp\": %d,"
-               "\"kd\": %d,"
-               "\"ki\": %d,"
-               "\"u_max\": %d,"
-               "\"heater_on_min\": %d,",
+               "{\"kp\":%d,"
+               "\"kd\":%d,"
+               "\"ki\":%d,"
+               "\"kd_dt\":%d,"
+               "\"u_max\":%d,"
+               "\"heater_on_min\":%d,",
                adv_settings.kp,
                adv_settings.kd,
                adv_settings.ki,
+               adv_settings.kd_dt,
                adv_settings.u_max,
                adv_settings.heater_on_min);
     fs_sprintf(buffer + os_strlen(buffer),
-               "\"heater_on_max\": %d,"
-               "\"heater_on_off\": %d,"
-               "\"heater_cold\": %d,",
+               "\"heater_on_max\":%d,"
+               "\"heater_on_off\":%d,"
+               "\"heater_cold\":%d,",
                adv_settings.heater_on_max,
                adv_settings.heater_on_off,
                adv_settings.heater_cold);
     fs_sprintf(buffer + os_strlen(buffer),
-               "\"warm_up_period\": %d,"
-               "\"wup_heater_on\": %d,"
-               "\"wup_heater_off\": %d}",
+               "\"warm_up_period\":%d,"
+               "\"wup_heater_on\":%d,"
+               "\"wup_heater_off\":%d}",
                adv_settings.warm_up_period,
                adv_settings.wup_heater_on,
                adv_settings.wup_heater_off);
@@ -883,6 +923,7 @@ void set_adv_ctrl_settings(struct _adv_ctrl_settings *value)
     adv_settings.kp = value->kp;
     adv_settings.kd = value->kd;
     adv_settings.ki = value->ki;
+    adv_settings.kd_dt = value->kd_dt;
     adv_settings.u_max = value->u_max;
     adv_settings.heater_on_min = value->heater_on_min;
     adv_settings.heater_on_max = value->heater_on_max;
@@ -905,10 +946,18 @@ void temp_control_init(void)
 {
     ALL("temp_control_init");
     // heater
+    heater_vars.heater_on = false;
     heater_vars.last_heater_on = 0;
     heater_vars.last_heater_off = 0;
 
+    // CTRL suspended
+    // CTRL suspended is not persistent
+    ctrl.ctrl_paused = false;
+
+    // programs
     init_program_list();
+
+    // now remaining settings that are persistent
 
     if (restore_cfg())
     {
@@ -943,6 +992,7 @@ void temp_control_init(void)
         adv_settings.kp = CTRL_KP;
         adv_settings.kd = CTRL_KD;
         adv_settings.ki = CTRL_KI;
+        adv_settings.kd_dt = CTRL_KD_DT;
         adv_settings.u_max = CTRL_U_MAX;
         adv_settings.heater_on_min = CTRL_HEATER_ON_MIN;
         adv_settings.heater_on_max = CTRL_HEATER_ON_MAX;
@@ -979,12 +1029,12 @@ static void run_control_manual(void)
     // running continuosly
     if (ctrl.heater_on_period == 0)
     {
-        if (!is_heater_on())
+        if (!heater_vars.heater_on)
             switch_on_heater();
         return;
     }
     // heater on duty cycle
-    if (is_heater_on())
+    if (heater_vars.heater_on)
     {
         if ((current_time->timestamp - heater_vars.last_heater_on) >= (ctrl.heater_on_period * 60))
             switch_off_heater();
@@ -1013,7 +1063,7 @@ static void run_control_auto(void)
     // update ctrl vars
     compute_ctrl_vars();
     // check if it's time to switch the heater off
-    if (is_heater_on())
+    if (heater_vars.heater_on)
     {
         // temperature reached the setpoint
         if (get_temp(0) >= ctrl.setpoint)
@@ -1022,8 +1072,10 @@ static void run_control_auto(void)
             return;
         }
         // the heater on period has completed
+        // or the heater off period is zero
         uint32 heater_on_since = current_time->timestamp - heater_vars.last_heater_on;
-        if (heater_on_since >= (ctrl.heater_on_period * 60))
+        if ((heater_on_since >= (ctrl.heater_on_period * 60)) &&
+            (ctrl.heater_off_period > 0))
         {
             switch_off_heater();
             return;
@@ -1054,7 +1106,7 @@ static void update_setpoint(void)
     ALL("update_setpoint");
     struct date *current_time = get_current_time();
     // find the current program
-    if(ctrl.program == NULL)
+    if (ctrl.program == NULL)
     {
         esp_diag.error(TEMP_CTRL_UPDATE_SETPOINT_NO_PROGRAM_AVAILABLE);
         ERROR("update_setpoint no program available");
@@ -1079,11 +1131,11 @@ static void update_setpoint(void)
     int current_minutes = (current_time->hours * 60) + current_time->minutes;
     for (idx = 0; idx < ctrl.program->period_count; idx++)
     {
-        if ((ctrl.program->period[idx].day_of_week == everyday) || (ctrl.program->period[idx].day_of_week == current_time->day_of_week))
+        if ((ctrl.program->periods[idx].day_of_week == everyday) || (ctrl.program->periods[idx].day_of_week == current_time->day_of_week))
         {
-            if ((ctrl.program->period[idx].mm_start <= current_minutes) && (current_minutes < ctrl.program->period[idx].mm_end))
+            if ((ctrl.program->periods[idx].mm_start <= current_minutes) && (current_minutes < ctrl.program->periods[idx].mm_end))
             {
-                set_point = ctrl.program->period[idx].setpoint;
+                set_point = ctrl.program->periods[idx].setpoint;
                 break;
             }
         }
@@ -1106,7 +1158,7 @@ static void run_control_program(void)
     // update ctrl vars
     compute_ctrl_vars();
     // check if it's time to switch the heater off
-    if (is_heater_on())
+    if (heater_vars.heater_on)
     {
         // temperature reached the setpoint
         if (get_temp(0) >= ctrl.setpoint)
@@ -1115,8 +1167,10 @@ static void run_control_program(void)
             return;
         }
         // the heater on period has completed
+        // or the heater off period is zero
         uint32 heater_on_since = current_time->timestamp - heater_vars.last_heater_on;
-        if (heater_on_since >= (ctrl.heater_on_period * 60))
+        if ((heater_on_since >= (ctrl.heater_on_period * 60)) &&
+            (ctrl.heater_off_period > 0))
         {
             switch_off_heater();
             return;
@@ -1149,7 +1203,7 @@ void temp_control_run(void)
     {
     case MODE_OFF:
         DEBUG("CTRL MODE OFF");
-        if (is_heater_on())
+        if (heater_vars.heater_on)
             switch_off_heater();
         break;
     case MODE_MANUAL:
@@ -1167,7 +1221,16 @@ void temp_control_run(void)
     default:
         break;
     }
-    DEBUG("after ctrl, HEATER -> %d", is_heater_on());
+    // check if exiting from CTRL suspended requires switching on the heater
+    if (!ctrl.ctrl_paused)
+    {
+        if (heater_vars.heater_on && (!is_heater_on()))
+            switch_on_heater();
+    }
+    if (heater_vars.heater_on && (!is_heater_on()))
+        DEBUG("after ctrl, HEATER -> %d (actually suspended)", is_heater_on());
+    else
+        DEBUG("after ctrl, HEATER -> %d", is_heater_on());
     DEBUG("  last switched on -> [%d] %s", heater_vars.last_heater_on, esp_time.get_timestr(heater_vars.last_heater_on));
     DEBUG(" last switched off -> [%d] %s", heater_vars.last_heater_off, esp_time.get_timestr(heater_vars.last_heater_off));
     subsequent_function(send_events_to_external_host);
@@ -1206,4 +1269,24 @@ int get_manual_pulse_off(void)
 int get_program_id(void)
 {
     return ctrl.program_id;
+}
+
+int get_ctrl_paused()
+{
+    return ctrl.ctrl_paused;
+}
+
+void set_ctrl_paused(bool val)
+{
+    ctrl.ctrl_paused = val;
+    if (ctrl.ctrl_paused)
+    {
+        DEBUG("TEMP CTRL -> heater ctrl paused");
+        heater_stop();
+        DEBUG("TEMP CTRL -> heater off");
+    }
+    else
+    {
+        DEBUG("TEMP CTRL -> heater ctrl active");
+    }
 }

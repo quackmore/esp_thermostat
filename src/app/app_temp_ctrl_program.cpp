@@ -318,8 +318,8 @@ void delete_program(struct prgm *prog_ptr)
 {
     if (prog_ptr == NULL)
         return;
-    if (prog_ptr->period)
-        delete[] prog_ptr->period;
+    if (prog_ptr->periods)
+        delete[] prog_ptr->periods;
     delete prog_ptr;
 }
 
@@ -453,12 +453,12 @@ struct prgm *load_program(int prg_id)
     new_prg->id = prg_id;
     new_prg->min_temp = tmp_min_temp;
     new_prg->period_count = tmp_period_count;
-    // there are no periods in the program
+    // there are no period in the program
     if (new_prg->period_count == 0)
         return new_prg;
     // there are periods in the program
-    new_prg->period = new struct prgm_period[tmp_period_count];
-    if (new_prg->period == NULL)
+    new_prg->periods = new struct prgm_period[tmp_period_count];
+    if (new_prg->periods == NULL)
     {
         esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_HEAP_EXHAUSTED, sizeof(struct prgm_period[tmp_period_count]));
         ERROR("load_program heap exhausted %d", sizeof(struct prgm_period[tmp_period_count]));
@@ -474,67 +474,67 @@ struct prgm *load_program(int prg_id)
             delete_program(new_prg);
             return NULL;
         }
-        Json_str period(tmp_periods.get_elem(count), tmp_periods.get_elem_len(count));
-        if (period.find_pair(f_str("wd")) != JSON_NEW_PAIR_FOUND)
+        Json_str periods(tmp_periods.get_elem(count), tmp_periods.get_elem_len(count));
+        if (periods.find_pair(f_str("wd")) != JSON_NEW_PAIR_FOUND)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        new_prg->period[count].day_of_week = (week_days)atoi(period.get_cur_pair_value());
-        if (period.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
+        new_prg->periods[count].day_of_week = (week_days)atoi(periods.get_cur_pair_value());
+        if (periods.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        new_prg->period[count].mm_start = (week_days)atoi(period.get_cur_pair_value());
-        if (period.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
+        new_prg->periods[count].mm_start = (week_days)atoi(periods.get_cur_pair_value());
+        if (periods.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        new_prg->period[count].mm_end = (week_days)atoi(period.get_cur_pair_value());
-        if (period.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
+        new_prg->periods[count].mm_end = (week_days)atoi(periods.get_cur_pair_value());
+        if (periods.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        if (period.get_cur_pair_value_type() != JSON_INTEGER)
+        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
         {
             esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
             ERROR("load_program array[%d] bad sintax", count);
             delete_program(new_prg);
             return NULL;
         }
-        new_prg->period[count].setpoint = (week_days)atoi(period.get_cur_pair_value());
+        new_prg->periods[count].setpoint = (week_days)atoi(periods.get_cur_pair_value());
     }
     espmem.stack_mon();
     return new_prg;
@@ -594,10 +594,10 @@ static bool save_program(struct prgm *prg)
     //     ]
     // }
     {
-        //  {"id": ,"min_temp": ,"period_count": ,"period": [
+        //  {"id": ,"min_temp": ,"period_count": ,"periods": [
         char buffer[(50 + 1 + 2 + 5 + 5)];
         fs_sprintf(buffer,
-                   "{\"id\": %d,\"min_temp\": %d,\"period_count\": %d,\"period\": [",
+                   "{\"id\": %d,\"min_temp\": %d,\"period_count\": %d,\"periods\": [",
                    prg->id,
                    prg->min_temp,
                    prg->period_count);
@@ -615,18 +615,18 @@ static bool save_program(struct prgm *prg)
             first_time = false;
             fs_sprintf(buffer,
                        "{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
-                       prg->period[idx].day_of_week,
-                       prg->period[idx].mm_start,
-                       prg->period[idx].mm_end,
-                       prg->period[idx].setpoint);
+                       prg->periods[idx].day_of_week,
+                       prg->periods[idx].mm_start,
+                       prg->periods[idx].mm_end,
+                       prg->periods[idx].setpoint);
         }
         else
             fs_sprintf(buffer,
                        ",{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
-                       prg->period[idx].day_of_week,
-                       prg->period[idx].mm_start,
-                       prg->period[idx].mm_end,
-                       prg->period[idx].setpoint);
+                       prg->periods[idx].day_of_week,
+                       prg->periods[idx].mm_start,
+                       prg->periods[idx].mm_end,
+                       prg->periods[idx].setpoint);
 
         cfgfile.n_append(buffer, os_strlen(buffer));
         espmem.stack_mon();

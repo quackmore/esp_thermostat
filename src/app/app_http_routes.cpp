@@ -93,8 +93,9 @@ static void getCtrlVars(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     //   "program_name": int,                 32 digit
     //   "pwr_off_timer_started_on": uint32,  11 digits
     //   "pwr_off_timer": int                  4 digits
+    //   "ctrl_paused": int                     1 digits
     // }
-    int str_len = 152 + 11 + 3 + 5 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1;
+    int str_len = 167 + 11 + 3 + 5 + 5 + 1 + 4 + 1 + 32 + 11 + 4 + 1 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
@@ -104,7 +105,7 @@ static void getCtrlVars(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
         return;
     }
     struct date *current_time = get_current_time();
-    // {"timestamp":,"timezone":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":}
+    // {"timestamp":,"timezone":,"current_temp":,"heater_status":,"auto_setpoint":,"ctrl_mode":,"program_name":"","pwr_off_timer_started_on":,"pwr_off_timer":,"ctrl_paused":}
     fs_sprintf(msg.ref,
                "{\"timestamp\":%d,"
                "\"timezone\":%d,",
@@ -127,9 +128,12 @@ static void getCtrlVars(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
                get_cur_program_name(get_program_id()));
     fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"pwr_off_timer_started_on\":%d,"
-               "\"pwr_off_timer\":%d}",
+               "\"pwr_off_timer\":%d,",
                (get_pwr_off_timer_started_on()),
                get_pwr_off_timer());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"ctrl_paused\":%d}",
+               get_ctrl_paused());
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
@@ -359,6 +363,7 @@ static void getCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
     //   ki: int,             6 digit (5 digit and sign)
+    //   kd_dt: int,          6 digit
     //   u_max: int,          6 digit (5 digit and sign)
     //   heater_on_min: int,  5 digit
     //   heater_on_max: int,  5 digit
@@ -368,8 +373,8 @@ static void getCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
     //   wup_heater_on: int,  5 digit
     //   wup_heater_off: int  5 digit
     // }
-    // {"kp": ,"kd": ,"ki": ,"u_max": ,"heater_on_min": ,"heater_on_max": ,"heater_on_off": ,"heater_cold": ,"warm_up_period": ,"wup_heater_on": ,"wup_heater_off": }
-    int str_len = 158 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1;
+    // {"kp":,"kd":,"ki":,"kd_dt":,"u_max":,"heater_on_min":,"heater_on_max":,"heater_on_off":,"heater_cold":,"warm_up_period":,"wup_heater_on":,"wup_heater_off":}
+    int str_len = 156 + 6 + 6 + 6 + 6 + 6 + 5 + 5 + 5 + 5 + 5 + 5 + 5 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
@@ -382,12 +387,15 @@ static void getCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
     fs_sprintf(msg.ref,
                "{\"kp\": %d,"
                "\"kd\": %d,"
-               "\"ki\": %d,"
+               "\"ki\": %d,",
+               adv_settings->kd_dt,
+               adv_settings->u_max,
+               adv_settings->heater_on_min);
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"kd_dt\": %d,"
                "\"u_max\": %d,"
                "\"heater_on_min\": %d,",
-               adv_settings->kp,
-               adv_settings->kd,
-               adv_settings->ki,
+               adv_settings->kd_dt,
                adv_settings->u_max,
                adv_settings->heater_on_min);
     fs_sprintf(msg.ref + os_strlen(msg.ref),
@@ -414,6 +422,7 @@ static void setCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
     //   kp: int,             6 digit (5 digit and sign)
     //   kd: int,             6 digit (5 digit and sign)
     //   ki: int,             6 digit (5 digit and sign)
+    //   kd_dt: int,          6 digit
     //   u_max: int,          6 digit (5 digit and sign)
     //   heater_on_min: int,  5 digit
     //   heater_on_max: int,  5 digit
@@ -493,6 +502,33 @@ static void setCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
     os_memset(tmp_str, 0, 8);
     os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
     adv_ctrl_settings.ki = atoi(tmp_str);
+
+    //   kd_dt: int,             6 digit
+    if (settings.find_pair(f_str("kd_dt")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'kd_dt'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'kd_dt' does not have an INTEGER value type"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 6)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("number bad format"), false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    int tmp_kd_dt = atoi(tmp_str);
+    if (tmp_kd_dt < 1)
+        adv_ctrl_settings.kd_dt = 1;
+    else if (tmp_kd_dt > 60)
+        adv_ctrl_settings.kd_dt = 60;
+    else
+        adv_ctrl_settings.kd_dt = tmp_kd_dt;
+    
 
     //   u_max: int,          6 digit (5 digit and sign)
     if (settings.find_pair(f_str("u_max")) != JSON_NEW_PAIR_FOUND)
@@ -1046,6 +1082,72 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     }
 }
 
+static void getCtrlPause(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("getCtrlPause");
+    // {
+    //   ctrl_paused: int,    1 digit
+    // }
+    // {"ctrl_paused":}
+    int str_len = 16 + 1 + 1;
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(APP_GETCTRLPAUSE_HEAP_EXHAUSTED, str_len);
+        ERROR("getCtrlPause heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
+        return;
+    }
+    fs_sprintf(msg.ref,
+               "{\"ctrl_pause\":%d}",
+               get_ctrl_paused());
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void setCtrlPause(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("setCtrlPause");
+    // {
+    //   ctrl_paused: int,    1 digit
+    // }
+    //
+    Json_str settings(parsed_req->req_content, parsed_req->content_len);
+    if (settings.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+
+    int tmp_ctrl_paused;
+    char tmp_str[8];
+
+    //   ctrl_paused: int,    1 digit
+    if (settings.find_pair(f_str("ctrl_paused")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'ctrl_paused'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'ctrl_paused' does not have an INTEGER value type"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_len() > 1)
+    {
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("number bad format"), false);
+        return;
+    }
+    os_memset(tmp_str, 0, 8);
+    os_strncpy(tmp_str, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    tmp_ctrl_paused = atoi(tmp_str);
+
+    if (tmp_ctrl_paused == 0)
+        set_ctrl_paused(false);
+    else
+        set_ctrl_paused(true);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
+}
+
 static void getProgramList(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getProgramList");
@@ -1144,19 +1246,19 @@ static void getProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         if (first_time)
         {
             fs_sprintf(msg.ref + os_strlen(msg.ref), "{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
-                       program->period[idx].day_of_week,
-                       program->period[idx].mm_start,
-                       program->period[idx].mm_end,
-                       program->period[idx].setpoint);
+                       program->periods[idx].day_of_week,
+                       program->periods[idx].mm_start,
+                       program->periods[idx].mm_end,
+                       program->periods[idx].setpoint);
             first_time = false;
         }
         else
         {
             fs_sprintf(msg.ref + os_strlen(msg.ref), ",{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
-                       program->period[idx].day_of_week,
-                       program->period[idx].mm_start,
-                       program->period[idx].mm_end,
-                       program->period[idx].setpoint);
+                       program->periods[idx].day_of_week,
+                       program->periods[idx].mm_start,
+                       program->periods[idx].mm_end,
+                       program->periods[idx].setpoint);
         }
     }
     fs_sprintf(msg.ref + os_strlen(msg.ref), "]}");
@@ -1286,7 +1388,7 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
-    program.period = (struct prgm_period *)periods_mem.ref;
+    program.periods = (struct prgm_period *)periods_mem.ref;
 
     // periods
     if (settings.find_pair(f_str("periods")) != JSON_NEW_PAIR_FOUND)
@@ -1335,7 +1437,7 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_wd, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].day_of_week = (week_days)atoi(str_wd);
+        program.periods[idx].day_of_week = (week_days)atoi(str_wd);
         //    b: int,         4 digits
         if (period.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
         {
@@ -1355,7 +1457,7 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_mm_start, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].mm_start = atoi(str_mm_start);
+        program.periods[idx].mm_start = atoi(str_mm_start);
         //    e: int,         4 digits
         if (period.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
         {
@@ -1375,7 +1477,7 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_mm_end, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].mm_end = atoi(str_mm_end);
+        program.periods[idx].mm_end = atoi(str_mm_end);
         //    sp: int,         5 digits
         if (period.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
         {
@@ -1395,7 +1497,7 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_setpoint, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].setpoint = atoi(str_setpoint);
+        program.periods[idx].setpoint = atoi(str_setpoint);
     }
     int result = add_program(program_name, &program);
     switch (result)
@@ -1503,7 +1605,7 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
         return;
     }
-    program.period = (struct prgm_period *)periods_mem.ref;
+    program.periods = (struct prgm_period *)periods_mem.ref;
 
     // periods
     if (settings.find_pair(f_str("periods")) != JSON_NEW_PAIR_FOUND)
@@ -1552,7 +1654,7 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_wd, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].day_of_week = (week_days)atoi(str_wd);
+        program.periods[idx].day_of_week = (week_days)atoi(str_wd);
         //    b: int,         4 digits
         if (period.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
         {
@@ -1572,7 +1674,7 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_mm_start, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].mm_start = atoi(str_mm_start);
+        program.periods[idx].mm_start = atoi(str_mm_start);
         //    e: int,         4 digits
         if (period.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
         {
@@ -1592,7 +1694,7 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_mm_end, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].mm_end = atoi(str_mm_end);
+        program.periods[idx].mm_end = atoi(str_mm_end);
         //    sp: int,         5 digits
         if (period.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
         {
@@ -1612,7 +1714,7 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
             return;
         }
         os_strncpy(str_setpoint, period.get_cur_pair_value(), period.get_cur_pair_value_len());
-        program.period[idx].setpoint = atoi(str_setpoint);
+        program.periods[idx].setpoint = atoi(str_setpoint);
     }
     int result = mod_program(program_id, program_name, &program);
     switch (result)
@@ -1653,6 +1755,16 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/log"))) && (parsed_req->req_method == HTTP_GET))
     {
         getCtrlEvents_first(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/pause"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        getCtrlPause(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/pause"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        setCtrlPause(ptr_espconn, parsed_req);
         return true;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/program"))) && (parsed_req->req_method == HTTP_GET))

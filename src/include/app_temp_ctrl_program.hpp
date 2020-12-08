@@ -46,7 +46,7 @@ struct prgm
     int id;
     int min_temp;
     int period_count;
-    struct prgm_period *period; // struct prgm_period period[]
+    struct prgm_period *periods; // struct prgm_period periods[]
 };
 
 #define MAX_PRG_COUNT_REACHED (-1)                         // errors codes for add_program and del_program

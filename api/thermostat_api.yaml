@@ -2,9 +2,10 @@ openapi: 3.0.0
 
 info:
   title: ESP_thermostat APIs
-  version: 2.0.0
+  version: 2.1.0
   description: >
-    These APIs are for reading, setting and controlling ESP_thermostat APP. 
+    These APIs are for reading, setting and controlling ESP_thermostat APP.
+    Based on ESPBOT API 
 
 servers:
   - url: http://{host}:{port}/{basePath}
@@ -14,6 +15,7 @@ servers:
         enum:
         - '192.168.10.1'
         - '192.168.1.105'
+        - '192.168.1.187'
         default: '192.168.10.1'
       port:
         enum:
@@ -1065,7 +1067,7 @@ paths:
                 $ref: '#/components/schemas/error'
   /wifi:
     get:
-      description: Get wifi inforation (working mode, AP SSID and IP address)
+      description: Get wifi information (working mode, AP SSID and IP address)
       summary: Get wifi info
       operationId: getWifi
       responses:
@@ -1081,18 +1083,18 @@ paths:
             application/json:      
               schema:
                 $ref: '#/components/schemas/error'
-  /wifi/cfg:
+  /wifi/station/cfg:
     get:
       description: Returns the wifi station config (SSID and password)
-      summary: Find wifi config
-      operationId: getWifiCfg
+      summary: Find wifi station config
+      operationId: getWifiStationCfg
       responses:
         '200':
-          description: The current wifi config
+          description: The current wifi station config
           content:
             application/json:      
               schema:
-                $ref: '#/components/schemas/wifiCfg'
+                $ref: '#/components/schemas/wifiStationCfg'
         'default':
           description: Unexpected error
           content:
@@ -1102,20 +1104,67 @@ paths:
     post:
       description: Sets wifi station config and connects to the AP
       summary: Set wifi station config
-      operationId: setWifiCfg
+      operationId: setWifiStationCfg
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/wifiCfg'
+              $ref: '#/components/schemas/wifiStationCfg'
+      responses:
+        '200':
+          description: Successful, returns current wifi station config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/wifiStationCfg'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /wifi/ap/cfg:
+    get:
+      description: Returns the wifi AP config (password and channel)
+      summary: Find wifi ap config
+      operationId: getWifiApCfg
+      responses:
+        '200':
+          description: The current wifi AP config
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/wifiApCfg'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets wifi AP config
+      summary: Set wifi AP config
+      operationId: setWifiApCfg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/wifiApCfg'
       responses:
         '200':
           description: Successful, returns current wifi config
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/wifiCfg'
+                $ref: '#/components/schemas/wifiApCfg'
         '400':
           description: Bad request.
           content:
@@ -1480,6 +1529,53 @@ paths:
             application/json:      
               schema:
                 $ref: '#/components/schemas/error'
+  /ctrl/pause:
+    get:
+      description: Returns heater control pause status
+      summary: Find heater control pause status
+      operationId: getCtrlPause
+      responses:
+        '200':
+          description: the heater control pause status
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlPause'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets heater control pause status
+      summary: Sets heater control pause status
+      operationId: setCtrlPause
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlPause'
+      responses:
+        '200':
+          description: Successful, return current heater control pause status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlPause'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
   /ctrl/vars:
     get:
       description: Returns the current ctrl variables, including
@@ -1530,6 +1626,7 @@ components:
       - kp
       - kd
       - ki
+      - kd_dt
       - u_max
       - heater_on_min
       - heater_on_max
@@ -1560,6 +1657,13 @@ components:
           default: 5
           minimum: -1000      
           maximum: 1000  
+        kd_dt:
+          type: integer
+          format: int32
+          description: Delta T for calculating the PID derivative coefficient
+          default: 1
+          minimum: 1      
+          maximum: 60  
         u_max:
           type: integer
           format: int32
@@ -1658,6 +1762,19 @@ components:
                 minimum: 0    
                 maximum: 4294967295
             additionalProperties: false
+      additionalProperties: false
+    ctrlPause:
+      type: object
+      required:
+      - ctrl_paused
+      properties:
+        ctrl_paused:
+          type: integer
+          format: int32
+          description: 0 -> heater control active; 1 -> heater control paused;  
+          default: 0
+          minimum: 0      
+          maximum: 1  
       additionalProperties: false
     ctrlProgram:
       type: object
@@ -1882,6 +1999,7 @@ components:
       - program_name
       - pwr_off_timer_started_on
       - pwr_off_timer
+      - ctrl_paused
       properties:
         timestamp:
           type: integer
@@ -1953,6 +2071,13 @@ components:
           default: 0
           minimum: 0      
           maximum: 32767
+        ctrl_paused:
+          type: integer
+          format: int32
+          description: 0 -> heater ctrl active; 1 -> heater ctrl paused
+          default: 0
+          minimum: 0      
+          maximum: 1
       additionalProperties: false
     deviceInfo:
       type: object
@@ -2598,7 +2723,26 @@ components:
           minimum: -14
           maximum: 14
       additionalProperties: false
-    wifiCfg:
+    wifiApCfg:
+      type: object
+      required:
+      - ap_channel
+      - ap_pwd
+      properties:
+        ap_channel:
+          type: integer
+          format: int32
+          description: AP channel
+          default: 1
+          minimum: 1
+          maximum: 11
+        ap_pwd:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 63
+      additionalProperties: false
+    wifiStationCfg:
       type: object
       required:
       - station_ssid

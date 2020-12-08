@@ -18,6 +18,7 @@
 #define CTRL_KP 1
 #define CTRL_KD -5
 #define CTRL_KI 5
+#define CTRL_KD_DT 1
 #define CTRL_U_MAX 46
 #define CTRL_HEATER_ON_MIN 2
 #define CTRL_HEATER_ON_MAX 13
@@ -32,6 +33,7 @@ struct _adv_ctrl_settings
     int kp;
     int kd;
     int ki;
+    int kd_dt;
     int u_max;
     int heater_on_min;
     int heater_on_max;
@@ -61,6 +63,9 @@ int get_auto_setpoint(void);
 int get_manual_pulse_on(void);
 int get_manual_pulse_off(void);
 int get_program_id(void);
+int get_ctrl_paused(void);
+void set_ctrl_paused(bool);
+
 
 void set_adv_ctrl_settings(struct _adv_ctrl_settings *);
 struct _adv_ctrl_settings *get_adv_ctrl_settings(void);

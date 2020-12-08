@@ -19,6 +19,9 @@ function esp_get_info() {
 }
 
 function update_page() {
+  // this runs periodically 
+  // so check that the page was not unloaded
+  // before updating
   if ($('#sm_time').length == 0)
     return;
   esp_get_ctrl_vars()
@@ -42,7 +45,10 @@ function esp_get_ctrl_vars() {
   });
 }
 
+var heater_ctrl_paused = 0;
+
 function update_summary(data) {
+  // day, time, temperature and relative humidity
   var week_day = new Array("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun");
   $("#sm_time").text(function () {
     var date = new Date(data.timestamp * 1000);
@@ -62,6 +68,7 @@ function update_summary(data) {
     $("#sm_humi").text("--.-");
   else
     $("#sm_humi").html((data.current_humi / 10).toFixed(1) + "<small> %</small>");
+  // thermostat mode a current status
   $("#sm_heater_status").text(function () {
     if (data.heater_status == 0)
       return "heater OFF";
@@ -86,6 +93,7 @@ function update_summary(data) {
   } else {
     $('#sm_ctrl_program').addClass('d-none');
   }
+  // power off status  
   if (data.pwr_off_timer == 0) {
     $("#sm_pwr_off").addClass('d-none');
   } else {
@@ -102,4 +110,48 @@ function update_summary(data) {
       $("#sm_ctrl_pwr_off").text(pwr_off_minutes);
     }
   }
+  // heater control pause 
+  if (data.ctrl_mode == 0) {
+    // mode OFF
+    $("#heater_ctrl").addClass('d-none');
+  } else {
+    $("#heater_ctrl").removeClass('d-none');
+    // check if control is suspended
+    if (data.ctrl_paused == 0) {
+      heater_ctrl_paused = 0;
+      $("#heater_ctrl_txt").text("Heater Control Active");
+      $("#heater_ctrl_btn").html('<i class="fa fa-pause fa-2x" aria-hidden="true"></i>');
+    } else {
+      heater_ctrl_paused = 1;
+      $("#heater_ctrl_txt").text("Heater Control Suspended");
+      $("#heater_ctrl_btn").html('<i class="fa fa-play fa-2x" aria-hidden="true"></i>');
+    }
+  }
 }
+
+function ctrl_pause(status) {
+  return esp_query({
+    type: 'POST',
+    url: '/api/ctrl/pause',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify({ ctrl_paused: status }),
+    success: null,
+    error: query_err
+  });
+}
+
+$('#heater_ctrl_btn').on('click', function () {
+  show_spinner().then(function () {
+    var new_status;
+    if (heater_ctrl_paused == 0)
+      new_status = 1;
+    else
+      new_status = 0;
+    ctrl_pause(new_status).then(function () {
+      esp_get_ctrl_vars().then(function () {
+        hide_spinner(500)
+      })
+    })
+  })
+});

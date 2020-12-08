@@ -238,6 +238,7 @@ function update_advCtrlSettings(data) {
   $('#adv_sett_kp').val(data.kp);
   $('#adv_sett_kd').val(data.kd);
   $('#adv_sett_ki').val(data.ki);
+  $('#adv_sett_kd_dt').val(data.kd_dt);
   $('#adv_sett_u_max').val(data.u_max);
   $('#adv_sett_heater_on_min').val(data.heater_on_min);
   $('#adv_sett_heater_on_max').val(data.heater_on_max);
@@ -247,6 +248,16 @@ function update_advCtrlSettings(data) {
   $('#adv_sett_wup_heater_on').val(data.wup_heater_on);
   $('#adv_sett_wup_heater_off').val(data.wup_heater_off);
 }
+
+$("#adv_sett_kd_dt").on('change', function () {
+  var value = Math.floor($('#adv_sett_kd_dt').val());
+  if (value < 1)
+    $('#adv_sett_kd_dt').val(1);
+  else if (value > 60)
+    $('#adv_sett_kd_dt').val(60);
+  else
+    $('#adv_sett_kd_dt').val(value);
+});
 
 $('#adv_sett_refresh').click(function () {
   show_spinner()
@@ -263,6 +274,7 @@ function jsonify_advCtrlSettings() {
   adv_settings.kp = parseInt($('#adv_sett_kp').val());
   adv_settings.kd = parseInt($('#adv_sett_kd').val());
   adv_settings.ki = parseInt($('#adv_sett_ki').val());
+  adv_settings.kd_dt = parseInt($('#adv_sett_kd_dt').val());
   adv_settings.u_max = parseInt($('#adv_sett_u_max').val());
   adv_settings.heater_on_min = parseInt($('#adv_sett_heater_on_min').val());
   adv_settings.heater_on_max = parseInt($('#adv_sett_heater_on_max').val());
