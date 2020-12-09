@@ -3,17 +3,19 @@
 $(document).ready(function () {
   esp_get_info().then(function () {
     esp_get_wifi_info().then(function () {
-      esp_get_cron().then(function () {
-        esp_get_mdns().then(function () {
-          esp_get_datetime().then(function (data) {
-            update_datetime(data).then(function () {
-              esp_get_ota().then(function () {
-                esp_get_diag().then(function () {
-                  hide_spinner(500);
-                  setTimeout(function () {
-                    periodically_update_datetime();
-                  }, 10000);
-                });
+      esp_get_ap().then(function () {
+        esp_get_cron().then(function () {
+          esp_get_mdns().then(function () {
+            esp_get_datetime().then(function (data) {
+              update_datetime(data).then(function () {
+                esp_get_ota().then(function () {
+                  esp_get_diag().then(function () {
+                    hide_spinner(500);
+                    setTimeout(function () {
+                      periodically_update_datetime();
+                    }, 10000);
+                  })
+                })
               })
             })
           })
