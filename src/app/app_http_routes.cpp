@@ -873,7 +873,7 @@ static void getCtrlEvents_next(struct http_split_send *p_sr)
             ev_i = get_event(idx);
             if (ev_i)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref),
-                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           "{\"ts\":%u,\"tp\":%d,\"vl\":%d}",
                            ev_i->timestamp,
                            ev_i->type,
                            ev_i->value);
@@ -917,7 +917,7 @@ static void getCtrlEvents_next(struct http_split_send *p_sr)
             ev_i = get_event(idx);
             if (ev_i)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref),
-                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           "{\"ts\":%u,\"tp\":%d,\"vl\":%d}",
                            ev_i->timestamp,
                            ev_i->type,
                            ev_i->value);
@@ -950,7 +950,7 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
             ev_i = get_event(idx);
             if (ev_i)
                 fs_sprintf(buffer,
-                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d},",
+                           "{\"ts\":%u,\"tp\":%d,\"vl\":%d},",
                            ev_i->timestamp,
                            ev_i->type,
                            ev_i->value);
@@ -1021,7 +1021,7 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
             ev_i = get_event(idx);
             if (ev_i)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref),
-                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           "{\"ts\":%u,\"tp\":%d,\"vl\":%d}",
                            ev_i->timestamp,
                            ev_i->type,
                            ev_i->value);
@@ -1071,7 +1071,7 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
             ev_i = get_event(idx);
             if (ev_i)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref),
-                           "{\"ts\":%d,\"tp\":%d,\"vl\":%d}",
+                           "{\"ts\":%u,\"tp\":%d,\"vl\":%d}",
                            ev_i->timestamp,
                            ev_i->type,
                            ev_i->value);

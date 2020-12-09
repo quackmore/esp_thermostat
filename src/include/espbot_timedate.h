@@ -19,11 +19,13 @@ extern "C"
 }
 #endif
 
+#define ESP_TIMEDATE_MAGIC 0xd9311571
 // declared public cause it's being stored into RTC memory
 struct espbot_time
 {
     uint32 sntp_time;
     uint32 rtc_time;
+    uint32 magic;
 };
 
 #endif
