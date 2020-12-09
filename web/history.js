@@ -4,7 +4,7 @@
 $(document).ready(function () {
   esp_get_history()
     .then(function () {
-      hide_spinner(500)
+      hide_spinner(800)
     });
 });
 
@@ -13,7 +13,7 @@ $('#history_refresh').on('click', function () {
     .then(function () {
       esp_get_history()
         .then(function () {
-          hide_spinner(500)
+          hide_spinner(800)
         });
     });
 });
@@ -77,10 +77,10 @@ function formatData(data) {
   if (tsLagsExists) {
     // uddate start date cause old data will be discarded
     startDate = newStartDate;
-    // if latest data is less than one day old use current time as end date
-    if ((((new Date()).getTime() / 1000) - endDate) < (60 * 60 * 24))
-      endDate = (new Date()).getTime() / 1000;
   }
+  // if latest data is less than one day old use current time as end date
+  if ((((new Date()).getTime() / 1000) - endDate) < (60 * 60 * 24))
+    endDate = (new Date()).getTime() / 1000;
   // if all timestamps are the same... add 1 second to end date 
   if (startDate == endDate)
     endDate = startDate + 1;
@@ -137,7 +137,7 @@ function formatData(data) {
     // discard values out of the selected time range
     var startingTemp = temperatureData[0].y;
     if (tsLagsExists) {
-      while (temperatureData.length && temperatureData[0].x < startDate) {
+      while (temperatureData.length && temperatureData[0].x < (new Date(startDate * 1000))) {
         startingTemp = temperatureData[0].y;
         temperatureData.shift();
       }
@@ -178,7 +178,7 @@ function formatData(data) {
     // discard values out of the selected time range
     var startingHumy = humidityData[0].y;
     if (tsLagsExists) {
-      while (humidityData.length && humidityData[0].x < startDate) {
+      while (humidityData.length && humidityData[0].x < (new Date(startDate * 1000))) {
         startingHumy = humidityData[0].y;
         humidityData.shift();
       }
@@ -205,7 +205,7 @@ function formatData(data) {
     // discard values out of the selected time range
     var startingSp = spData[0].y;
     if (tsLagsExists) {
-      while (spData.length && spData[0].x < startDate) {
+      while (spData.length && spData[0].x < (new Date(startDate * 1000))) {
         startingSp = spData[0].y;
         spData.shift();
       }
@@ -229,7 +229,7 @@ function formatData(data) {
     // discard values out of the selected time range
     var startingHeater = heaterData[0].y;
     if (tsLagsExists) {
-      while (heaterData.length && heaterData[0].x < startDate) {
+      while (heaterData.length && heaterData[0].x < (new Date(startDate * 1000))) {
         startingHeater = heaterData[0].y;
         heaterData.shift();
       }
