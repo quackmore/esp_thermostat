@@ -388,9 +388,9 @@ static void getCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
                "{\"kp\": %d,"
                "\"kd\": %d,"
                "\"ki\": %d,",
-               adv_settings->kd_dt,
-               adv_settings->u_max,
-               adv_settings->heater_on_min);
+               adv_settings->kp,
+               adv_settings->kd,
+               adv_settings->ki);
     fs_sprintf(msg.ref + os_strlen(msg.ref),
                "\"kd_dt\": %d,"
                "\"u_max\": %d,"
