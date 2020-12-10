@@ -31,6 +31,7 @@ public:
   TimeDate(){};
   ~TimeDate(){};
 
+  void init_essential(void);
   void init(void);
   int save_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
 
