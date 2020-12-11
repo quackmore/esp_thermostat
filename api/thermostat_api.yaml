@@ -2,7 +2,7 @@ openapi: 3.0.0
 
 info:
   title: ESP_thermostat APIs
-  version: 2.1.0
+  version: 2.1.1
   description: >
     These APIs are for reading, setting and controlling ESP_thermostat APP.
     Based on ESPBOT API 
