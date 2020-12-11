@@ -108,6 +108,37 @@
     <div class="card-body">
       <div class="card-title">
         <div class="row no-gutters">
+          <h5 class="card-title my-auto"><i class="fa fa-cogs"></i> Calibration Offsets</h5>
+        </div>
+      </div>
+      <div class="form-group row">
+        <label for="temp_cal_offset" class="col-form-label col-6 my-auto">Temperature offset</label>
+        <div class="input-group-sm col-6 ml-auto my-auto border-0">
+          <input type="number" placeholder="0" min="-100" max="100" step="0.1" class="form-control"
+            id="temp_cal_offset">
+        </div>
+      </div>
+      <div class="form-group row">
+        <label for="humi_cal_offset" class="col-form-label col-6 my-auto">Rel. Humidity offset</label>
+        <div class="input-group-sm col-6 ml-auto my-auto border-0">
+          <input type="number" placeholder="0" min="-100" max="100" step="0.1" class="form-control"
+            id="humi_cal_offset">
+        </div>
+      </div>
+      <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups" id="cal_buttons">
+        <div class="btn-group mr-2" role="group" aria-label="First group">
+          <button type="button" class="btn btn-primary" id="cal_refresh">Refresh</button>
+        </div>
+        <div class="btn-group mr-2" role="group" aria-label="Second group">
+          <button type="button" class="btn btn-primary" id="cal_save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card border-info">
+    <div class="card-body">
+      <div class="card-title">
+        <div class="row no-gutters">
           <h5 class="card-title my-auto"><i class="fa fa-cogs"></i> Remote log settings</h5>
         </div>
       </div>

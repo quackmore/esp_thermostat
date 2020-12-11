@@ -14,7 +14,7 @@ servers:
       host:
         enum:
         - '192.168.10.1'
-        - '192.168.1.105'
+        - '192.168.1.176'
         - '192.168.1.187'
         default: '192.168.10.1'
       port:
@@ -1435,6 +1435,53 @@ paths:
             application/json:      
               schema:
                 $ref: '#/components/schemas/error'
+  /ctrl/reading_cal:
+    get:
+      description: Returns the calibration offsets for reading temperature and relative humidity
+      summary: Find the calibration offsets
+      operationId: getReadingCal
+      responses:
+        '200':
+          description: the calibration offsets
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/ctrlReadingCal'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+    post:
+      description: Sets the calibration offsets for reading temperature and relative humidity
+      summary: Sets the calibration offsets
+      operationId: setReadingCal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ctrlReadingCal'
+      responses:
+        '200':
+          description: Successful, return current calibration offsets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ctrlReadingCal'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
   /ctrl/remoteLog:
     get:
       description: Returns remote host (log host) settings
@@ -1889,6 +1936,26 @@ components:
                 minLength: 0
                 maxLength: 31
             additionalProperties: false
+      additionalProperties: false
+    ctrlReadingCal:
+      type: object
+      required:
+      - temp_cal_offset
+      - humi_cal_offset
+      properties:
+        temp_cal_offset:
+          type: integer
+          format: int32
+          description: says if the log to the remote host in enabled (1) or not (0)
+          default: 0
+          minimum: -1000   
+          maximum: 1000  
+        humi_cal_offset:
+          type: integer
+          format: int32
+          default: 0
+          minimum: -1000
+          maximum: 1000
       additionalProperties: false
     ctrlRemoteLog:
       type: object

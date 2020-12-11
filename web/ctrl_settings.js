@@ -7,8 +7,10 @@ $(document).ready(function () {
       update_programs(data).then(function () {
         esp_get_ctrl_settings().then(function () {
           esp_get_ctrl_adv_settings().then(function () {
-            esp_get_rl_settings().then(function () {
-              hide_spinner(500);
+            esp_get_cal_offsets().then(function () {
+              esp_get_rl_settings().then(function () {
+                hide_spinner(500);
+              })
             })
           })
         })
@@ -16,6 +18,7 @@ $(document).ready(function () {
     })
   })
 });
+
 
 // SETTINGS
 
@@ -307,6 +310,76 @@ $('#adv_sett_save').click(function () {
   });
 });
 
+// CALIBRATION OFFSETS
+
+function esp_get_cal_offsets() {
+  return esp_query({
+    type: 'GET',
+    url: '/api/ctrl/reading_cal',
+    dataType: 'json',
+    success: update_cal_offset,
+    error: query_err
+  });
+}
+
+function update_cal_offset(data) {
+  $('#temp_cal_offset').val((data.temp_cal_offset / 10).toFixed(1));
+  $('#humi_cal_offset').val((data.humi_cal_offset / 10).toFixed(1));
+}
+
+$('#temp_cal_offset').on('change', function () {
+  if ($('#temp_cal_offset').val() < -100)
+    $('#temp_cal_offset').val(-100);
+  else if ($('#temp_cal_offset').val() > 100)
+    $('#temp_cal_offset').val(100);
+  else
+    $('#temp_cal_offset').val(parseFloat($('#temp_cal_offset').val()).toFixed(1));
+});
+
+$('#humi_cal_offset').on('change', function () {
+  if ($('#humi_cal_offset').val() < -100)
+    $('#humi_cal_offset').val(-100);
+  else if ($('#humi_cal_offset').val() > 100)
+    $('#humi_cal_offset').val(100);
+  else
+    $('#humi_cal_offset').val(parseFloat($('#humi_cal_offset').val()).toFixed(1));
+});
+
+$('#cal_refresh').click(function () {
+  show_spinner().then(function () {
+    esp_get_cal_offsets().then(function () {
+      hide_spinner(500)
+    });
+  });
+});
+
+function jsonify_cal_offsets() {
+  var cal_settings = new Object;
+  cal_settings.temp_cal_offset = parseFloat($('#temp_cal_offset').val()) * 10;
+  cal_settings.humi_cal_offset = parseFloat($('#humi_cal_offset').val()) * 10;
+  return cal_settings;
+}
+
+function save_cal_offsets() {
+  return esp_query({
+    type: 'POST',
+    url: '/api/ctrl/reading_cal',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify(jsonify_cal_offsets()),
+    success: null,
+    error: query_err
+  });
+}
+
+$('#cal_save').click(function () {
+  show_spinner().then(function () {
+    save_cal_offsets().then(function () {
+      alert("Setting saved.");
+      hide_spinner(500);
+    });
+  });
+});
 
 // REMOTE LOG SETTINGS
 

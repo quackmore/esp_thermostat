@@ -24,4 +24,10 @@ void temp_log_read(void *);
 int get_temp(int idx);
 int get_humi(int idx);
 
+// readings calibration offsets
+void set_cal_offset(int temp_offset, int humi_offset);
+int get_temp_cal_offset(void);
+int get_humi_cal_offset(void);
+
+
 #endif

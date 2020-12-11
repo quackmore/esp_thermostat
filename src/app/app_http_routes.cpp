@@ -528,7 +528,6 @@ static void setCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
         adv_ctrl_settings.kd_dt = 60;
     else
         adv_ctrl_settings.kd_dt = tmp_kd_dt;
-    
 
     //   u_max: int,          6 digit (5 digit and sign)
     if (settings.find_pair(f_str("u_max")) != JSON_NEW_PAIR_FOUND)
@@ -692,6 +691,106 @@ static void setCtrlAdvSettings(struct espconn *ptr_espconn, Http_parsed_req *par
 
     set_adv_ctrl_settings(&adv_ctrl_settings);
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
+}
+
+static void getReadingCal(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("getReadingCal");
+    // {"temp_cal_offset":,"humi_cal_offset":},
+    // {
+    //   temp_cal_offset:  int         5 digits
+    //   humi_cal_offset": int         5 digits
+    // }
+    int str_len = 39 + 5 + 5 + 1;
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(APP_GETREADINGCAL_HEAP_EXHAUSTED, str_len);
+        ERROR("getReadingCal heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted!"), false);
+        return;
+    }
+    // {"temp_cal_offset":,"humi_cal_offset":},
+    fs_sprintf(msg.ref,
+               "{\"temp_cal_offset\":%d,\"humi_cal_offset\":%d}",
+               get_temp_cal_offset(),
+               get_humi_cal_offset());
+
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void setReadingCal(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("setReadingCal");
+    // {
+    //   temp_cal_offset:  int         5 digits
+    //   humi_cal_offset": int         5 digits
+    // }
+    Json_str settings(parsed_req->req_content, parsed_req->content_len);
+    if (settings.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    //    temp_cal_offset: int,         5 digits
+    int settings_temp_cal_offset;
+    if (settings.find_pair(f_str("temp_cal_offset")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'temp_cal_offset'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'temp_cal_offset' does not have an INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk str_temp_cal_offset(settings.get_cur_pair_value_len());
+    if (str_temp_cal_offset.ref == NULL)
+    {
+        esp_diag.error(APP_SETREADINGCAL_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setReadingCal heap exhausted %d", settings.get_cur_pair_value_len());
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    os_strncpy(str_temp_cal_offset.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    settings_temp_cal_offset = atoi(str_temp_cal_offset.ref);
+
+    //    humi_cal_offset: int,  5 digits
+    int settings_humi_cal_offset;
+    if (settings.find_pair(f_str("humi_cal_offset")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'humi_cal_offset'"), false);
+        return;
+    }
+    if (settings.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'humi_cal_offset' does not have an INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk str_humi_cal_offset(settings.get_cur_pair_value_len());
+    if (str_humi_cal_offset.ref == NULL)
+    {
+        esp_diag.error(APP_SETREADINGCAL_HEAP_EXHAUSTED, settings.get_cur_pair_value_len());
+        ERROR("setReadingCal heap exhausted %d", settings.get_cur_pair_value_len());
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        return;
+    }
+    os_strncpy(str_humi_cal_offset.ref, settings.get_cur_pair_value(), settings.get_cur_pair_value_len());
+    settings_humi_cal_offset = atoi(str_humi_cal_offset.ref);
+
+    // save settings
+    if ((settings_temp_cal_offset < -1000) ||
+        (settings_temp_cal_offset > 1000) ||
+        (settings_humi_cal_offset < -1000) ||
+        (settings_humi_cal_offset > 1000))
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Calibration Offsets out of range"), false);
+    }
+    else
+    {
+        set_cal_offset(settings_temp_cal_offset, settings_humi_cal_offset);
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Settings saved\"}"), false);
+    }
 }
 
 static void getRemoteLog(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1790,6 +1889,16 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/program"))) && (parsed_req->req_method == HTTP_POST))
     {
         createProgram(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/reading_cal"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        getReadingCal(ptr_espconn, parsed_req);
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/reading_cal"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        setReadingCal(ptr_espconn, parsed_req);
         return true;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ctrl/remoteLog"))) && (parsed_req->req_method == HTTP_GET))
