@@ -283,17 +283,32 @@ void init_remote_logger(void)
 void log_event(uint32 timestamp, activity_event_t type, int value)
 {
     ALL("log_event");
+    static bool overwriting_unreported_events = false;
     last_event_idx++;
     if (last_event_idx >= REMOTE_LOG_LENGTH)
         last_event_idx = 0;
     events[last_event_idx].timestamp = timestamp;
     events[last_event_idx].type = type;
     events[last_event_idx].value = value;
-    // raise an error when overwriting a not yet reported event
-    if (event_sent[last_event_idx] == false)
+    // raise an error when overwriting not reported events
+    // but just on the first occurrence
+    if ((event_sent[last_event_idx] == false) &&
+        remote_log_vars.enabled &&
+        !overwriting_unreported_events)
     {
-        esp_diag.error(REMOTELOG_OVERWRITING_UNREPORTED_EVENT);
-        ERROR("log_event overwriting an not yet reported event");
+        overwriting_unreported_events = true;
+        esp_diag.error(REMOTELOG_OVERWRITING_UNREPORTED_EVENTS);
+        ERROR("log_event overwriting not yet reported events");
+    }
+    // clear error when no longer overwriting reported events
+    // but just on the first occurrence
+    if ((event_sent[last_event_idx] == true) &&
+        remote_log_vars.enabled &&
+        overwriting_unreported_events)
+    {
+        overwriting_unreported_events = false;
+        esp_diag.info(REMOTELOG_NO_MORE_OVERWRITING_UNREPORTED_EVENTS);
+        INFO("log_event no longer overwriting not yet reported events");
     }
     event_sent[last_event_idx] = false;
     // print_last_events();
