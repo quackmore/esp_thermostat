@@ -12,9 +12,9 @@
 extern "C"
 {
 #include "c_types.h"
-}
-
+#include "osapi.h"
 #include "espbot_mem_macros.h"
+}
 
 #define DIAG_LED_DISABLED 0x00
 
@@ -29,7 +29,7 @@ extern "C"
 
 #define EVNT_QUEUE_SIZE 100 // 100 * sizeof(strut dia_event) => 1200 bytes
 
-#define DIA_LED ESPBOT_D4 // D4 will be configured as output and will be in use by espbot
+#define DIA_LED ESPBOT_D4 // D4 will be configured as output and will be in use by espbot \
                           // unless _diag_led_mask is set to 0
 
 struct dia_event
@@ -41,74 +41,41 @@ struct dia_event
   uint32 value;
 };
 
-class Espbot_diag
-{
-private:
-  struct dia_event _evnt_queue[EVNT_QUEUE_SIZE];
-  uint32 _uart_0_bitrate;
-  bool _sdk_print_enabled;
-  int _event_count;
-  char _last_event;
-  char _diag_led_mask; // bitmask 00?? ????
-                       //           || ||||_ 1 -> show FATAL events on led
-                       //           || |||__ 1 -> show ERROR events on led
-                       //           || ||___ 1 -> show WARNING events on led
-                       //           || |____ 1 -> show INFO events on led
-                       //           ||______ 1 -> show DEBUG events on led
-                       //           |_______ 1 -> show TRACE events on led
-                       // set _diag_led_mask to 0 will avoid espbot using any led
-  void add_event(char type, int code, uint32 value);
+void dia_init_essential(void);
+void dia_init_custom(void);
 
-  int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR
-  int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
-                                   // return CFG_REQUIRES_UPDATE when cfg require update
-                                   // return CFG_ERROR otherwise
+// DIAGNOSTIC EVENTS
+// diagnostic events are kept in memory and available through REST API
+//
+// ADDING EVENTS
+void dia_fatal_evnt(int code, uint32 value = 0); // calling one of these functions
+void dia_error_evnt(int code, uint32 value = 0); // will add a new event to the event queue
+void dia_warn_evnt(int code, uint32 value = 0);  // the new event will be marked as
+void dia_info_evnt(int code, uint32 value = 0);  // not acknoledged
+void dia_debug_evnt(int code, uint32 value = 0); // and the diagnostic led will be turned on
+void dia_trace_evnt(int code, uint32 value = 0); // (if enabled)
+//
+// GETTING AND ACKNOWLEDGING EVENTS
+void dia_ack_events(void); // acknoledge all the saved events
+int dia_get_max_events_count(void);
+struct dia_event *dia_get_event(int idx);
+int dia_get_unack_events(void);
 
-public:
-  Espbot_diag(){};
-  ~Espbot_diag(){};
+// DIAGNOSTIC CONFIG
+void dia_set_led_mask(char); //
+void dia_set_serial_log_mask(char);
+bool dia_set_uart_0_bitrate(uint32); // return false when input is a wrong bitrate
+void dia_set_sdk_print_enabled(bool);
+char *dia_cfg_json_stringify(char *dest = NULL, int len = 0);
+int dia_cfg_save(void); // return CFG_OK on success, otherwise CFG_ERROR
 
-  // easy access
-  char _serial_log_mask; // bitmask 0??? ????
-                         //          ||| ||||_ 1 -> show FATAL events on UART_0
-                         //          ||| |||__ 1 -> show ERROR events on UART_0
-                         //          ||| ||___ 1 -> show WARNING events on UART_0
-                         //          ||| |____ 1 -> show INFO events on UART_0
-                         //          |||______ 1 -> show DEBUG events on UART_0
-                         //          ||_______ 1 -> show TRACE events on UART_0
-                         //          |________ 1 -> show ALL events on UART_0
-
-  void init_essential(void);
-  void init_custom(void);
-
-  void fatal(int code, uint32 value = 0); // calling one of these functions
-  void error(int code, uint32 value = 0); // will add a new event to the event queue
-  void warn(int code, uint32 value = 0);  // the new event will be marked as
-  void info(int code, uint32 value = 0);  // not acknoledged
-  void debug(int code, uint32 value = 0); // and the diagnostic led will be turned on
-  void trace(int code, uint32 value = 0); // (if enabled)
-
-  int get_max_events_count(void);           // useful for iterations
-  struct dia_event *get_event(int idx = 0); // return a pointer to an event (NULL if no event exists)
-                                            // idx=0 -> last event
-                                            // idx=1 -> previous event
-  int get_unack_events(void);               // return the count of not acknoeledge events
-  void ack_events(void);                    // acknoledge all the saved events
-  char get_led_mask(void);                  //
-  void set_led_mask(char);                  //
-  char get_serial_log_mask(void);
-  void set_serial_log_mask(char);
-  uint32 get_uart_0_bitrate(void);
-  bool set_uart_0_bitrate(uint32); // return false when input is a wrong bitrate
-  bool get_sdk_print_enabled(void);
-  void set_sdk_print_enabled(bool);
-  int save_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
-};
+// DIAGNOSTIC SERIAL LOG MACROS
+bool diag_log_err_type(int);
 
 #define FATAL(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_FATAL)                     \
+    if (diag_log_err_type(EVNT_FATAL))                              \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[F] "; \
@@ -128,7 +95,7 @@ public:
 #define ERROR(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_ERROR)                     \
+    if (diag_log_err_type(EVNT_ERROR))                              \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[E] "; \
@@ -148,7 +115,7 @@ public:
 #define WARN(fmt, ...)                                              \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_WARN)                      \
+    if (diag_log_err_type(EVNT_WARN))                               \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[W] "; \
@@ -168,7 +135,7 @@ public:
 #define INFO(fmt, ...)                                              \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_INFO)                      \
+    if (diag_log_err_type(EVNT_INFO))                               \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[I] "; \
@@ -188,7 +155,7 @@ public:
 #define DEBUG(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_DEBUG)                     \
+    if (diag_log_err_type(EVNT_DEBUG))                              \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[D] "; \
@@ -208,7 +175,7 @@ public:
 #define TRACE(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_TRACE)                     \
+    if (diag_log_err_type(EVNT_TRACE))                              \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[T] "; \
@@ -228,7 +195,7 @@ public:
 #define ALL(fmt, ...)                                               \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log_mask & EVNT_ALL)                       \
+    if (diag_log_err_type(EVNT_ALL))                                \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[A] "; \

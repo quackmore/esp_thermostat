@@ -6,15 +6,27 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __LIBRARY_EVENT_CODES_H__
-#define __LIBRARY_EVENT_CODES_H__
 
-#define DHT_HEAP_EXHAUSTED 0x1000
-#define DHT_READING_TIMEOUT 0x1001
-#define DHT_READING_CHECKSUM_ERR 0x1002
-#define DHT_READ_HEAP_EXHAUSTED 0x1003
+#ifndef __WEBSERVER_HPP__
+#define __WEBSERVER_HPP__
 
-#define MAX6675_THERMOCOUPLE_DISCONNECTED 0x1004
-#define MAX6675_HEAP_EXHAUSTED 0x1005
+// extern "C"
+// {
+// #include "c_types.h"
+// #include "espconn.h"
+// }
+
+#define SERVER_PORT 80
+
+typedef enum
+{
+  http_svr_up = 0,
+  http_svr_down
+} Http_svr_status;
+
+void http_svr_init(void);
+void http_svr_start(uint32);
+void http_svr_stop(void);
+Http_svr_status http_svr_get_status(void);
 
 #endif

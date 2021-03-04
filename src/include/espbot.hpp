@@ -14,55 +14,36 @@ extern "C"
 #include "osapi.h"
 }
 
-#define SIG_STAMODE_GOT_IP 0
-#define SIG_STAMODE_DISCONNECTED 1
-#define SIG_SOFTAPMODE_STACONNECTED 2
-#define SIG_SOFTAPMODE_STADISCONNECTED 3
-#define SIG_SOFTAPMODE_READY 4
-#define SIG_HTTP_CHECK_PENDING_RESPONSE 5
-#define SIG_NEXT_FUNCTION 6
+enum
+{
+  SIG_staMode_gotIp = 0,
+  SIG_staMode_disconnected,
+  SIG_softapMode_staConnected,
+  SIG_softapMode_staDisconnected,
+  SIG_softapMode_ready,
+  SIG_http_checkPendingResponse,
+  SIG_next_function
+};
+
+enum
+{
+  ESPBOT_restart = 0,
+  ESPBOT_rebootAfterOta
+};
 
 // execute a function from a task
-void subsequent_function(void (*fun)(void));
+void next_function(void (*fun)(void));
 
-#define ESP_REBOOT 0
-#define ESP_OTA_REBOOT 1
+// make espbot_init available to user_main.c
+extern "C" void espbot_init(void);
 
-class Espbot
-{
-private:
-  char _name[33];
-  uint32 _lastRebootTime;
-
-  // espbot task
-  static const int QUEUE_LEN = 8;
-  os_event_t *_queue;
-
-  // REPLACED BY A CRON JOB (2020-02-17)
-  // heartbeat timer
-  // static const int HEARTBEAT_PERIOD = 60000;
-  // os_timer_t _heartbeat;
-
-  int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR
-  int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
-                                   // return CFG_REQUIRES_UPDATE when cfg require update
-                                   // return CFG_ERROR otherwise
-  int save_cfg(void);              // return CFG_OK on success, otherwise CFG_ERROR
-
-protected:
-public:
-  Espbot(){};
-  ~Espbot(){};
-  void init(void);
-  void reset(int); // ESP_REBOOT     -> system_restart()
-                   // ESP_OTA_REBOOT -> system_upgrade_reboot()
-  uint32 get_chip_id(void);
-  uint8 get_boot_version(void);
-  const char *get_sdk_version(void);
-  char *get_version(void);
-  char *get_name(void);
-  void set_name(char *); // requires string
-  uint32 get_last_reboot_time(void);
-};
+void espbot_reset(int);
+char *espbot_get_name(void);
+char *espbot_get_version(void);
+uint32 espbot_get_last_reboot_time(void);
+void espbot_set_name(char *);
+int espbot_cfg_save(void);
+char *espbot_cfg_json_stringify(char *dest = NULL, int len = 0);
+char *espbot_info_json_stringify(char *dest = NULL, int len = 0);
 
 #endif

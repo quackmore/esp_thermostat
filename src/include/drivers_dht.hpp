@@ -21,8 +21,8 @@ extern "C"
 #include "osapi.h"
 }
 
-#include "library_sensor.hpp"
-#include "library_common_types.hpp"
+#include "drivers_sensor.hpp"
+#include "drivers_common_types.hpp"
 
 typedef enum
 {

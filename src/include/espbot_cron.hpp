@@ -57,23 +57,25 @@ void cron_del_job(int job_id);
 /*
  * get current time as struct date
  */
-struct date *get_current_time(void);
+struct date *cron_get_current_time(void);
 
 /*
  * force initialization of current time before than cron execution
  */
-void init_current_time(void);
+void cron_init_current_time(void);
 
 
 /*
  * CONFIGURATION & PERSISTENCY
  */
-void enable_cron(void);
-void start_cron(void);
-void disable_cron(void);
-void stop_cron(void);
+void cron_enable(void);
+void cron_disable(void);
+void cron_start(void);
+void cron_stop(void);
 bool cron_enabled(void);
-int save_cron_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
+
+char *cron_cfg_json_stringify(char *dest = NULL, int len = 0);
+int cron_cfg_save(void);
 
 /*
  * DEBUG

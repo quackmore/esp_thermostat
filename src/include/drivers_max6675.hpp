@@ -16,7 +16,7 @@ extern "C"
 #include "osapi.h"
 }
 
-#include "library_sensor.hpp"
+#include "drivers_sensor.hpp"
 
 class Max6675 : public Esp8266_Sensor
 {

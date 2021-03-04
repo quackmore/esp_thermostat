@@ -6,39 +6,9 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __DRIVERS_HPP__
+#define __DRIVERS_HPP__
 
-#ifndef __WEBSERVER_HPP__
-#define __WEBSERVER_HPP__
-
-extern "C"
-{
-#include "c_types.h"
-#include "espconn.h"
-}
-
-#define SERVER_PORT 80
-
-typedef enum
-{
-  up = 0,
-  down
-} Websvr_status;
-
-class Websvr
-{
-public:
-  Websvr(){};
-  ~Websvr(){};
-
-  void init(void);
-  void start(uint32); // port
-  void stop(void);
-  Websvr_status get_status(void);
-
-private:
-  Websvr_status _status;
-  struct espconn _esp_conn;
-  esp_tcp _esptcp;
-};
+extern char *drivers_release;
 
 #endif

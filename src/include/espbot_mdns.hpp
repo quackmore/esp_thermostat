@@ -15,31 +15,13 @@ extern "C"
 #include "espconn.h"
 }
 
-class Mdns
-{
-private:
-  bool _enabled;
-  bool _running;
-  struct mdns_info _info;
-
-  int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR
-  int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
-                                   // return CFG_REQUIRES_UPDATE when cfg require update
-                                   // return CFG_ERROR otherwise
-
-public:
-  Mdns(){};
-  ~Mdns(){};
-
-  void init(void);
-  int save_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
-
-  void enable(void);
-  void disable(void);
-  bool is_enabled(void);
-
-  void start(char *app_alias);
-  void stop(void);
-};
+void mdns_init(void);
+char *mdns_cfg_json_stringify(char *dest = NULL, int len = 0);
+int mdns_cfg_save(void);
+void mdns_enable(void);
+void mdns_disable(void);
+bool mdns_is_enabled(void);
+void mdns_start(char *app_alias);
+void mdns_stop(void);
 
 #endif

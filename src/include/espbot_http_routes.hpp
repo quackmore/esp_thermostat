@@ -11,7 +11,6 @@
 #define __ESPBOT_HTTP_ROUTES_HPP__
 
 #include "espbot_http.hpp"
-#include "espbot_webserver.hpp"
 
 void init_controllers(void);
 void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req);

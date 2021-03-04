@@ -6,27 +6,37 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __CFGFILE_HPP__
+#define __CFGFILE_HPP__
 
-#ifndef __SNTP_HPP__
-#define __SNTP_HPP__
+#include "espbot_spiffs.hpp"
+#include "espbot_json.hpp"
 
-extern "C"
-{
-#include "c_types.h"
-}
-
-class Sntp
-{
-private:
-
-public:
-  Sntp(){};
-  ~Sntp(){};
-
-  void start(void);
-  void stop(void);
-  uint32 get_timestamp();
-  char *get_timestr(uint32);
+enum {
+  CFG_ok = 0,
+  CFG_cantRestore,
+  CFG_error,
+  CFG_notUpdated
 };
+
+/**
+ * @brief Config file class
+ * A config file with JSON syntax
+ * 
+ */
+class Cfgfile: public Espfile, public JSONP
+{
+public:
+  char *_json_str;
+  
+  /**
+   * @brief Construct a new Cfgfile object
+   * 
+   * @param filename 
+   */
+  Cfgfile(char *filename);
+  ~Cfgfile();
+};
+
 
 #endif

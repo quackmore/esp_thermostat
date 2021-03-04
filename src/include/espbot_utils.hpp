@@ -15,6 +15,7 @@ extern "C"
 #include "ip_addr.h"
 
   int atoi(char *);
+  float atof(char *);
   int atoh(char *);
 }
 

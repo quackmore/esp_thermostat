@@ -20,58 +20,39 @@ extern "C"
 #define GOT_IP_AFTER_CONNECTION ((os_param_t)1)
 #define GOT_IP_ALREADY_CONNECTED ((os_param_t)2)
 
-struct fast_scan
-{
-  char ssid_len;
-  char *ch_list;
-  char ch_count;
-  int ch_idx;
-  void (*callback)(void *);
-  void *param;
-  sint8 best_rssi;
-  char best_channel;
-  char best_bssid[6];
-};
+void espwifi_init(void); // Will try to start as STATION:
+                         //   IF there is no valid STATION cfg
+                         //      or failed to connect
+                         //   THEN will switch wifi to STATIONAP
+                         //        (if there is a valid STATION cfg
+                         //         will keep on trying to connect to AP)
+                         // While working as STATION, any connection failure
+                         // will switch wifi to STATIONAP
 
-class Wifi
-{
-public:
-  Wifi(){};
-  ~Wifi(){};
+// WORKING MODE AND STATUS
+void espwifi_get_ip_address(struct ip_info *);
+void espwifi_work_as_ap(void);
+void espwifi_connect_to_ap(void);
+bool espwifi_is_connected(void); // true  -> connected to AP
+                                 // false -> not connected to AP
 
-  static void init(void); // Will try to start as STATION:
-                          //   IF there is no valid STATION cfg
-                          //      or failed to connect
-                          //   THEN will switch wifi to STATIONAP
-                          //        (if there is a valid STATION cfg
-                          //         will keep on trying to connect to AP)
-                          // While working as STATION, any connection failure
-                          // will switch wifi to STATIONAP
+// scan
+void espwifi_scan_for_ap(struct scan_config *config, void (*)(void *), void *); // start a new AP scan
+int espwifi_get_ap_count(void);                                                 // return the number of APs found
+char *espwifi_get_ap_name(int);                                                 // return the name of AP number xx
+char *espwifi_scan_results_json_stringify(char *dest = NULL, int len = 0);
+// (from 0 to (ap_count-1))
+void espwifi_free_ap_list(void);
 
-  static void station_set_ssid(char *t_str, int t_len); // won't save configuraion to flash
-  static void station_set_pwd(char *t_str, int t_len);  // won't save configuraion to flash
-  static void ap_set_pwd(char *t_str, int t_len);       // won't save configuraion to flash
-  static void ap_set_ch(int ch);                        // won't save configuraion to flash
-  static char *station_get_ssid(void);
-  static char *station_get_password(void);
-  static char *ap_get_password(void);
-  static int ap_get_ch(void);
-
-  static int save_cfg(void); // return 0 on success, otherwise 1 save configuration to flash
-
-  static void set_stationap(void); // static because called by timer exhaustion (pointer required)
-  static void connect(void);       // static because called by timer exhaustion (pointer required)
-  static bool is_connected(void);  // true  -> connected to AP
-                                   // false -> not connected to AP
-
-  static void scan_for_ap(struct scan_config *, void (*)(void *), void *); // start a new AP scan
-  static int get_ap_count(void);                                           // return the number of APs found
-  static char *get_ap_name(int);                                           // return the name of AP number xx (from 0 to (ap_count-1))
-  static void free_ap_list(void);
-  static void fast_scan_for_best_ap(char *ssid, char ch_list[], char ch_count, void (*callback)(void *), void *param);
-  static struct fast_scan *get_fast_scan_results(void);
-  static int get_op_mode(void);
-  static void get_ip_address(struct ip_info *);
-};
+// CONFIG
+void espwifi_station_set_ssid(char *t_str, int t_len); // won't save configuraion to flash
+void espwifi_station_set_pwd(char *t_str, int t_len);  // won't save configuraion to flash
+void espwifi_ap_set_pwd(char *t_str, int t_len);       // won't save configuraion to flash
+void espwifi_ap_set_ch(int ch);                        // won't save configuraion to flash
+int espwifi_cfg_save(void);                            // returned values according to espbot_cfgfile enum
+                                                       // save configuration to flash
+char *espwifi_station_get_ssid(void);
+char *espwifi_cfg_json_stringify(char *dest = NULL, int len = 0);
+char *espwifi_status_json_stringify(char *dest = NULL, int len = 0);
 
 #endif

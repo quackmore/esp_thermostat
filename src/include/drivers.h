@@ -6,9 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __LIBRARY_HPP__
-#define __LIBRARY_HPP__
+#ifndef __DRIVERS_H__
+#define __DRIVERS_H__
 
-extern char *library_release;
+#include "c_types.h"
+
+
+// these are espbot_2.0 memory management methods
+// https://github.com/quackmore/espbot_2.0
+void *call_espbot_zalloc(size_t size);
+void call_espbot_free(void *addr);
 
 #endif
