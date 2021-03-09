@@ -37,9 +37,8 @@ function update_program_list(data) {
     $('#sett_prg_name')
       .empty()
       .append(function () {
-        var prg_count = data.prg_count;
         var options = '';
-        for (var ii = 0; ii < prg_count; ii++) {
+        for (var ii = 0; ii < data.prg_headings.length; ii++) {
           options += '<option value="' + data.prg_headings[ii].id + '">' + data.prg_headings[ii].desc + '</option>';
         };
         return options;
@@ -672,7 +671,6 @@ function load_program_modal(id) {
       "id": -1,
       "name": "",
       "min_temp": 0,
-      "period_count": 0,
       "periods": []
     };
     update_program_modal(true);
@@ -698,7 +696,6 @@ function add_prg_period(idx) {
     "id": curr_program.id,
     "name": curr_program.name,
     "min_temp": curr_program.min_temp,
-    "period_count": (curr_program.period_count + 1),
     "periods": []
   };
   var new_period = new Object();
@@ -739,7 +736,6 @@ function del_prg_period(idx) {
     "id": curr_program.id,
     "name": curr_program.name,
     "min_temp": curr_program.min_temp,
-    "period_count": (curr_program.period_count - 1),
     "periods": []
   };
   for (var ii = 0; ii < idx; ii++) {

@@ -234,7 +234,7 @@ void delete_program(struct prgm *prog_ptr)
 //     ]
 // }
 
-int load_program(int prg_id, struct prgm *prg)
+int load_program(int prg_id, struct prgm *&prg)
 {
     if (program_lst->size() == 0)
     {
@@ -299,7 +299,10 @@ int load_program(int prg_id, struct prgm *prg)
     prg->period_count = periods.len();
     // there are no period in the program
     if (prg->period_count == 0)
+    {
+        prg->periods = NULL;
         return id;
+    }
     // there are periods in the program
     if (prg->period_count > MAX_PROGRAM_PERIODS)
     {
@@ -523,7 +526,7 @@ int del_program(int prg_id)
     os_memset(filename, 0, 32);
     fs_snprintf(filename, 31, "program_%d.prg", prg_id);
     TRACE("del_program filename %s", filename);
-        Cfgfile cfgfile(filename);
+    Cfgfile cfgfile(filename);
     if (cfgfile.remove() != SPIFFS_OK)
         return CFG_error;
     // find the program id into the headings list

@@ -65,7 +65,7 @@ int mod_program(int prg_id, char *name, struct prgm *prg); // return id or <0 if
 extern struct prgm *current_program;                       //
                                                            //
 char *get_cur_program_name(int);                           //
-int load_program(int idx, struct prgm *prg);               // allocates memory on heap (prg)
+int load_program(int idx, struct prgm *&prg);               // allocates memory on heap (prg)
 void delete_program(struct prgm *);                        // delete a struct prgm allocated on heap
 
 char *program_json_stringify(struct prgm *, char *dest = NULL, int len = 0);

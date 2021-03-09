@@ -253,7 +253,7 @@ void temp_log_init(void)
 {
     ALL("temp_log_init");
     // calibration offsets
-    if (temp_log_restore_cfg() != CFG_ok)
+    if (temp_log_restore_cfg() == CFG_ok)
     {
         dia_info_evnt(TEMPLOG_CUSTOM_CAL_CFG);
         INFO("temp_log_init custom calibration offsets found");

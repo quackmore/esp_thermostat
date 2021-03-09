@@ -56,7 +56,7 @@ static int remote_log_restore_cfg(void)
     int port = cfgfile.getInt(f_str("port"));
     char path[128];
     os_memset(path, 0, 128);
-    cfgfile.getStr(f_str("path"), host, 128);
+    cfgfile.getStr(f_str("path"), path, 128);
     if (cfgfile.getErr() != JSON_noerr)
     {
         dia_error_evnt(REMOTELOG_RESTORE_CFG_ERROR);

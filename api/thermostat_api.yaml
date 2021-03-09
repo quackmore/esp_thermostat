@@ -1829,7 +1829,6 @@ components:
       - id
       - name
       - min_temp
-      - period_count
       - periods
       properties:
         id:
@@ -1852,13 +1851,6 @@ components:
           default: 0
           minimum: -1000
           maximum: 1000
-        period_count:
-          type: integer
-          format: int32
-          description: the numer of periods defined by the program
-          default: 0
-          minimum: 0
-          maximum: 50
         periods:
           type: array
           maxItems: 50
@@ -1903,16 +1895,8 @@ components:
     ctrlProgramList:
       type: object
       required:
-      - prg_count
       - prg_headings
       properties:
-        prg_count:
-          type: integer
-          format: int32
-          description: the program count
-          default: 0
-          minimum: 0      
-          maximum: 20
         prg_headings:
           type: array
           maxItems: 20

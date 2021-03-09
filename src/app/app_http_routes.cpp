@@ -241,7 +241,7 @@ static void setRemoteLog(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     bool enabled = (bool)settings.getInt(f_str("enabled"));
     char host[16];
     os_memset(host, 0, 16);
-    settings.getStr(f_str("enabled"), host, 16);
+    settings.getStr(f_str("host"), host, 16);
     int port = settings.getInt(f_str("port"));
     char path[128];
     os_memset(path, 0, 128);
@@ -637,40 +637,47 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     struct prgm program;
     program.min_temp = min_temp;
     program.period_count = periods.len();
-    // program.periods = (struct prgm_period *)new char[sizeof(struct prgm_period) * program.period_count];
-    program.periods = (struct prgm_period *)new struct prgm_period[program.period_count];
-    if (program.periods == NULL)
+    if (program.period_count > 0)
     {
-        dia_error_evnt(APP_ROUTES_CREATEPROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
-        ERROR("createProgram heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-    int idx;
-    for (idx = 0; idx < program.period_count; idx++)
-    {
-        JSONP period = periods.getObj(idx);
-        // {
-        //     "wd" : 8,
-        //     "b" : 100,
-        //     "e" : 200,
-        //     "sp" : 200
-        // }
-        week_days wd = (week_days)period.getInt(f_str("wd"));
-        int b = period.getInt(f_str("b"));
-        int e = period.getInt(f_str("e"));
-        int sp = period.getInt(f_str("sp"));
-        if (period.getErr() != JSON_noerr)
+        program.periods = (struct prgm_period *)new struct prgm_period[program.period_count];
+        if (program.periods == NULL)
         {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
-            delete program.periods;
+            dia_error_evnt(APP_ROUTES_CREATEPROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
+            ERROR("createProgram heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
             return;
         }
-        program.periods[idx].day_of_week = wd;
-        program.periods[idx].mm_start = b;
-        program.periods[idx].mm_end = e;
-        program.periods[idx].setpoint = sp;
+        int idx;
+        for (idx = 0; idx < program.period_count; idx++)
+        {
+            JSONP period = periods.getObj(idx);
+            // {
+            //     "wd" : 8,
+            //     "b" : 100,
+            //     "e" : 200,
+            //     "sp" : 200
+            // }
+            week_days wd = (week_days)period.getInt(f_str("wd"));
+            int b = period.getInt(f_str("b"));
+            int e = period.getInt(f_str("e"));
+            int sp = period.getInt(f_str("sp"));
+            if (period.getErr() != JSON_noerr)
+            {
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+                delete program.periods;
+                return;
+            }
+            program.periods[idx].day_of_week = wd;
+            program.periods[idx].mm_start = b;
+            program.periods[idx].mm_end = e;
+            program.periods[idx].setpoint = sp;
+        }
     }
+    else
+    {
+        program.periods = NULL;
+    }
+
     int result = add_program(name, &program);
     switch (result)
     {
@@ -718,39 +725,47 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     struct prgm program;
     program.min_temp = min_temp;
     program.period_count = periods.len();
-    program.periods = (struct prgm_period *)new struct prgm_period[program.period_count];
-    if (program.periods == NULL)
+    if (program.period_count > 0)
     {
-        dia_error_evnt(APP_ROUTES_UPDATEPROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
-        ERROR("createProgram heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-    int idx;
-    for (idx = 0; idx < program.period_count; idx++)
-    {
-        JSONP period = periods.getObj(idx);
-        // {
-        //     "wd" : 8,
-        //     "b" : 100,
-        //     "e" : 200,
-        //     "sp" : 200
-        // }
-        week_days wd = (week_days)period.getInt(f_str("wd"));
-        int b = period.getInt(f_str("b"));
-        int e = period.getInt(f_str("e"));
-        int sp = period.getInt(f_str("sp"));
-        if (period.getErr() != JSON_noerr)
+        program.periods = (struct prgm_period *)new struct prgm_period[program.period_count];
+        if (program.periods == NULL)
         {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
-            delete program.periods;
+            dia_error_evnt(APP_ROUTES_UPDATEPROGRAM_HEAP_EXHAUSTED, (sizeof(struct prgm_period) * program.period_count));
+            ERROR("createProgram heap exhausted %d", (sizeof(struct prgm_period) * program.period_count));
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
             return;
         }
-        program.periods[idx].day_of_week = wd;
-        program.periods[idx].mm_start = b;
-        program.periods[idx].mm_end = e;
-        program.periods[idx].setpoint = sp;
+        int idx;
+        for (idx = 0; idx < program.period_count; idx++)
+        {
+            JSONP period = periods.getObj(idx);
+            // {
+            //     "wd" : 8,
+            //     "b" : 100,
+            //     "e" : 200,
+            //     "sp" : 200
+            // }
+            week_days wd = (week_days)period.getInt(f_str("wd"));
+            int b = period.getInt(f_str("b"));
+            int e = period.getInt(f_str("e"));
+            int sp = period.getInt(f_str("sp"));
+            if (period.getErr() != JSON_noerr)
+            {
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+                delete program.periods;
+                return;
+            }
+            program.periods[idx].day_of_week = wd;
+            program.periods[idx].mm_start = b;
+            program.periods[idx].mm_end = e;
+            program.periods[idx].setpoint = sp;
+        }
     }
+    else
+    {
+        program.periods = NULL;
+    }
+    
     int result = mod_program(program_id, name, &program);
     switch (result)
     {
