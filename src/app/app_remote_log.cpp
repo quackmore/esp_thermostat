@@ -436,6 +436,7 @@ static void post_info(void *param)
         TRACE("remote_log_post_info POSTing str: %s", msg);
         TRACE("remote_log_post_info event %d was sent", event_idx);
         espclient->send_req(msg, os_strlen(msg), check_answer, (void *)event_idx);
+        delete msg;
     }
     break;
     default:
