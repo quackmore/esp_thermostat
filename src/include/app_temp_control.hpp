@@ -14,7 +14,7 @@
 #define MODE_AUTO 2
 #define MODE_PROGRAM 3
 
-// control advanced setting
+// control advanced default settings
 #define CTRL_KP 1
 #define CTRL_KD -5
 #define CTRL_KI 5
@@ -45,10 +45,14 @@ struct _adv_ctrl_settings
 };
 
 void temp_control_init(void);
-void ctrl_off(void);
-void ctrl_manual(int heater_on_period, int heater_off_period, int stop_after);
-void ctrl_auto(int set_point, int stop_after);
-void ctrl_program(int program_id);
+int ctrl_off(void);
+int ctrl_manual(int heater_on_period, int heater_off_period, int stop_after);
+int ctrl_auto(int set_point, int stop_after);
+int ctrl_program(int program_id);
+char *ctrl_vars_json_stringify(char *dest = NULL, int len = 0);
+char *ctrl_paused_json_stringify(char *dest = NULL, int len = 0);
+char *ctrl_settings_json_stringify(char *dest = NULL, int len = 0);
+char *ctrl_settings_full_json_stringify(char *dest = NULL, int len = 0);
 
 
 void temp_control_run(void);
@@ -57,17 +61,11 @@ void temp_control_run(void);
 // get control settings & vars
 //
 int get_current_mode(void);
-int get_pwr_off_timer(void);
-uint32 get_pwr_off_timer_started_on(void);
-int get_auto_setpoint(void);
-int get_manual_pulse_on(void);
-int get_manual_pulse_off(void);
 int get_program_id(void);
-int get_ctrl_paused(void);
 void set_ctrl_paused(bool);
 
 
-void set_adv_ctrl_settings(struct _adv_ctrl_settings *);
-struct _adv_ctrl_settings *get_adv_ctrl_settings(void);
+int set_adv_ctrl_settings(struct _adv_ctrl_settings *);
+char *adv_settings_json_stringify(char *dest = NULL, int len = 0);
 
 #endif

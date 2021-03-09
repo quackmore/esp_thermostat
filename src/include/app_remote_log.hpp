@@ -10,9 +10,6 @@
 #define __APP_REMOTE_LOG_HPP__
 
 #define REMOTE_LOG_LENGTH 600
-// #define REMOTE_LOG_HOST_IP "192.168.1.102"
-// #define REMOTE_LOG_HOST_PORT 1880
-// #define REMOTE_LOG_HOST_PATH "/remote_log"
 
 typedef enum
 {
@@ -38,10 +35,7 @@ struct activity_event *get_event(int idx);
 void send_events_to_external_host(void);
 
 // remote host configuration
-void set_remote_log(bool enabled, char* host, int port, char* path);
-bool get_remote_log_enabled(void);
-char *get_remote_log_host(void);
-int get_remote_log_port(void);
-char *get_remote_log_path(void);
+int set_remote_log(bool enabled, char* host, int port, char* path);
+char *remote_log_cfg_json_stringify(char *dest = NULL, int len = 0);
 
 #endif

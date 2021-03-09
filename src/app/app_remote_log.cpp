@@ -11,19 +11,22 @@
 extern "C"
 {
 #include "mem.h"
-#include "library_dio_task.h"
+#include "drivers_dio_task.h"
 #include "esp8266_io.h"
+#include "user_interface.h"
 }
 
 #include "app.hpp"
 #include "app_event_codes.h"
 #include "app_remote_log.hpp"
-#include "espbot_config.hpp"
-#include "espbot_global.hpp"
+#include "espbot_cfgfile.hpp"
+#include "espbot_diagnostic.hpp"
 #include "espbot_gpio.hpp"
+#include "espbot_http_client.hpp"
 #include "espbot_mem_macros.h"
+#include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webclient.hpp"
+#include "espbot_wifi.hpp"
 
 //
 // remote host configuration
@@ -32,213 +35,138 @@ extern "C"
 static struct
 {
     bool enabled;
-    char *host;
+    char host[16];
     int port;
-    char *path;
-} remote_log_vars;
+    char path[128];
+} remote_log_cfg;
 
-#define REMOTE_LOG_FILENAME f_str("remote_log.cfg")
+#define REMOTE_LOG_FILENAME ((char *)f_str("remote_log.cfg"))
+// {"enabled":,"host":"","port":,"path":""}
 
-static bool restore_cfg(void)
+static int remote_log_restore_cfg(void)
 {
     ALL("remote_log_restore_cfg");
-    if (!espfs.is_available())
+    if (!Espfile::exists(REMOTE_LOG_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(REMOTE_LOG_FILENAME);
+    bool enabled = (bool)cfgfile.getInt(f_str("enabled"));
+    char host[16];
+    os_memset(host, 0, 16);
+    cfgfile.getStr(f_str("host"), host, 16);
+    int port = cfgfile.getInt(f_str("port"));
+    char path[128];
+    os_memset(path, 0, 128);
+    cfgfile.getStr(f_str("path"), host, 128);
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(REMOTELOG_RESTORE_CFG_FS_NOT_AVAILABLE);
-        ERROR("remote_log_restore_cfg FS not available");
-        return false;
+        dia_error_evnt(REMOTELOG_RESTORE_CFG_ERROR);
+        ERROR("remote_log_restore_cfg error");
+        return CFG_error;
     }
-    File_to_json cfgfile(REMOTE_LOG_FILENAME);
-    if (cfgfile.exists())
-    {
-        // "{"enabled": ,"host": "","port": ,"path": ""}",
-        // enabled
-        if (cfgfile.find_string(f_str("enabled")))
-        {
-            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
-            ERROR("remote_log_restore_cfg cannot find \"enabled\"");
-            return false;
-        }
-        remote_log_vars.enabled = atoi(cfgfile.get_value());
-        // host
-        if (cfgfile.find_string(f_str("host")))
-        {
-            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
-            ERROR("remote_log_restore_cfg cannot find \"host\"");
-            return false;
-        }
-        if (remote_log_vars.host)
-            delete[] remote_log_vars.host;
-        remote_log_vars.host = new char[os_strlen(cfgfile.get_value()) + 1];
-        os_strcpy(remote_log_vars.host, cfgfile.get_value());
-        // port
-        if (cfgfile.find_string(f_str("port")))
-        {
-            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
-            ERROR("remote_log_restore_cfg cannot find \"port\"");
-            return false;
-        }
-        remote_log_vars.port = atoi(cfgfile.get_value());
-        // path
-        if (cfgfile.find_string(f_str("path")))
-        {
-            esp_diag.error(REMOTELOG_RESTORE_CFG_INCOMPLETE);
-            ERROR("remote_log_restore_cfg cannot find \"path\"");
-            return false;
-        }
-        if (remote_log_vars.path)
-            delete[] remote_log_vars.path;
-        remote_log_vars.path = new char[os_strlen(cfgfile.get_value()) + 1];
-        os_strcpy(remote_log_vars.path, cfgfile.get_value());
-        return true;
-    }
-    return false;
+    remote_log_cfg.enabled = enabled;
+    os_memset(remote_log_cfg.host, 0, 16);
+    os_strncpy(remote_log_cfg.host, host, 15);
+    remote_log_cfg.port = port;
+    os_memset(remote_log_cfg.path, 0, 128);
+    os_strncpy(remote_log_cfg.path, path, 127);
+    mem_mon_stack();
+    return CFG_ok;
 }
 
-static bool saved_cfg_not_updated(void)
+static int remote_log_saved_cfg_updated(void)
 {
-    ALL("remote_log_saved_cfg_not_updated");
-    if (!espfs.is_available())
+    ALL("remote_log_saved_cfg_updated");
+    if (!Espfile::exists(REMOTE_LOG_FILENAME))
     {
-        esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_FS_NOT_AVAILABLE);
-        ERROR("remote_log_saved_cfg_not_updated FS not available");
-        return true;
+        return CFG_notUpdated;
     }
-    File_to_json cfgfile(REMOTE_LOG_FILENAME);
-    if (cfgfile.exists())
+    Cfgfile cfgfile(REMOTE_LOG_FILENAME);
+    bool enabled = (bool)cfgfile.getInt(f_str("enabled"));
+    char host[16];
+    os_memset(host, 0, 16);
+    cfgfile.getStr(f_str("host"), host, 16);
+    int port = cfgfile.getInt(f_str("port"));
+    char path[128];
+    os_memset(path, 0, 128);
+    cfgfile.getStr(f_str("path"), host, 128);
+    mem_mon_stack();
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        // "{"enabled": ,"host": "","port": ,"path": ""}",
-        // enabled
-        if (cfgfile.find_string(f_str("enabled")))
-        {
-            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("remote_log_saved_cfg_not_updated cannot find \"enabled\"");
-            return true;
-        }
-        if (remote_log_vars.enabled != atoi(cfgfile.get_value()))
-            return true;
-        // host
-        if (cfgfile.find_string(f_str("host")))
-        {
-            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("remote_log_saved_cfg_not_updated cannot find \"host\"");
-            return true;
-        }
-        if (0 != os_strcmp(remote_log_vars.host, cfgfile.get_value()))
-            return true;
-        // port
-        if (cfgfile.find_string(f_str("port")))
-        {
-            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("remote_log_saved_cfg_not_updated cannot find \"port\"");
-            return true;
-        }
-        if (remote_log_vars.port != atoi(cfgfile.get_value()))
-            return true;
-        // path
-        if (cfgfile.find_string(f_str("path")))
-        {
-            esp_diag.error(REMOTELOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("remote_log_saved_cfg_not_updated cannot find \"path\"");
-            return true;
-        }
-        if (0 != os_strcmp(remote_log_vars.path, cfgfile.get_value()))
-            return true;
-        return false;
+        // no need to raise an error, the cfg file will be overwritten
+        // dia_error_evnt(REMOTELOG_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("remote_log_saved_cfg_updated error");
+        return CFG_error;
     }
-    espmem.stack_mon();
-    return true;
+    if ((remote_log_cfg.enabled != enabled) ||
+        os_strncmp(remote_log_cfg.host, host, 16) ||
+        (remote_log_cfg.port != port) ||
+        os_strncmp(remote_log_cfg.path, path, 128))
+    {
+        return CFG_notUpdated;
+    }
+    return CFG_ok;
 }
 
-static void remove_cfg(void)
+char *remote_log_cfg_json_stringify(char *dest, int len)
 {
-    ALL("remote_log_remove_cfg");
-    if (!espfs.is_available())
+    // {"enabled":,"host":"","port":,"path":""}
+    int msg_len = 40 + 1 + 16 + 6 + 128 + 1;
+    char *msg;
+    if (dest == NULL)
     {
-        esp_diag.error(REMOTELOG_REMOVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("remote_log_remove_cfg FS not available");
-        return;
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(REMOTELOG_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("remote_log_cfg_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
     }
-    if (Ffile::exists(&espfs, (char *)REMOTE_LOG_FILENAME))
-    {
-        Ffile cfgfile(&espfs, (char *)REMOTE_LOG_FILENAME);
-        cfgfile.remove();
-    }
-}
-
-static void save_cfg(void)
-{
-    ALL("remote_log_save_cfg");
-    if (saved_cfg_not_updated())
-        remove_cfg();
     else
-        return;
-    if (!espfs.is_available())
     {
-        esp_diag.error(REMOTELOG_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("remote_log_save_cfg FS not available");
-        return;
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
     }
-    Ffile cfgfile(&espfs, (char *)REMOTE_LOG_FILENAME);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(REMOTELOG_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("remote_log_save_cfg cannot open %s", REMOTE_LOG_FILENAME);
-        return;
-    }
-    int file_len = 44 + 1 + os_strlen(remote_log_vars.host) + 5 + os_strlen(remote_log_vars.path) + 1;
-    Heap_chunk buffer(file_len);
-    if (buffer.ref == NULL)
-    {
-        esp_diag.error(REMOTELOG_SAVE_CFG_HEAP_EXHAUSTED);
-        ERROR("remote_log_save_cfg heap exausted %d", file_len);
-        return;
-    }
-
-    // "{"enabled": ,"host": "","port": ,"path": ""}",
-    fs_sprintf(buffer.ref,
-               "{\"enabled\": %d,\"host\": \"%s\",\"port\": %d,\"path\": \"%s\"}",
-               remote_log_vars.enabled,
-               remote_log_vars.host,
-               remote_log_vars.port,
-               remote_log_vars.path);
-    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
-    espmem.stack_mon();
+    fs_sprintf(msg,
+               "{\"enabled\":%d,\"host\":\"%s\",\"port\":%d,\"path\":\"%s\"}",
+               remote_log_cfg.enabled,
+               remote_log_cfg.host,
+               remote_log_cfg.port,
+               remote_log_cfg.path);
+    mem_mon_stack();
+    return msg;
 }
 
-void set_remote_log(bool enabled, char *host, int port, char *path)
+int remote_log_cfg_save(void)
 {
-    remote_log_vars.enabled = enabled;
-    if (remote_log_vars.host)
-        delete[] remote_log_vars.host;
-    remote_log_vars.host = new char[os_strlen(host) + 1];
-    os_strcpy(remote_log_vars.host, host);
-    remote_log_vars.port = port;
-    if (remote_log_vars.path)
-        delete[] remote_log_vars.path;
-    remote_log_vars.path = new char[os_strlen(path) + 1];
-    os_strcpy(remote_log_vars.path, path);
-    save_cfg();
+    ALL("remote_log_cfg_save");
+    if (remote_log_saved_cfg_updated() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(REMOTE_LOG_FILENAME);
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char str[192];
+    remote_log_cfg_json_stringify(str, 192);
+    int res = cfgfile.n_append(str, os_strlen(str));
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
-bool get_remote_log_enabled(void)
+int set_remote_log(bool enabled, char *host, int port, char *path)
 {
-    return remote_log_vars.enabled;
-}
-
-char *get_remote_log_host(void)
-{
-    return remote_log_vars.host;
-}
-
-int get_remote_log_port(void)
-{
-    return remote_log_vars.port;
-}
-
-char *get_remote_log_path(void)
-{
-    return remote_log_vars.path;
+    remote_log_cfg.enabled = enabled;
+    os_memset(remote_log_cfg.host, 0, 16);
+    os_strncpy(remote_log_cfg.host, host, 15);
+    remote_log_cfg.port = port;
+    os_memset(remote_log_cfg.path, 0, 128);
+    os_strncpy(remote_log_cfg.path, path, 127);
+    return remote_log_cfg_save();
 }
 
 //
@@ -251,7 +179,7 @@ static int last_event_idx;
 
 void print_last_events(void);
 
-static Webclnt *espclient;
+static Http_clt *espclient;
 
 void init_remote_logger(void)
 {
@@ -267,17 +195,17 @@ void init_remote_logger(void)
     }
     last_event_idx = 0;
 
-    if (!restore_cfg())
+    if (remote_log_restore_cfg() != CFG_ok)
     {
-        remote_log_vars.enabled = false;
-        remote_log_vars.host = (char *)f_str("");
-        remote_log_vars.port = 0;
-        remote_log_vars.path = (char *)f_str("");
-        esp_diag.info(REMOTELOG_INIT_DEFAULT_CFG);
+        remote_log_cfg.enabled = false;
+        os_memset(remote_log_cfg.host, 0, 16);
+        remote_log_cfg.port = 0;
+        os_memset(remote_log_cfg.path, 0, 128);
+        dia_info_evnt(REMOTELOG_INIT_DEFAULT_CFG);
         INFO("init_remote_logger no cfg available");
     }
 
-    espclient = new Webclnt;
+    espclient = new Http_clt;
 }
 
 void log_event(uint32 timestamp, activity_event_t type, int value)
@@ -293,21 +221,21 @@ void log_event(uint32 timestamp, activity_event_t type, int value)
     // raise an error when overwriting not reported events
     // but just on the first occurrence
     if ((event_sent[last_event_idx] == false) &&
-        remote_log_vars.enabled &&
+        remote_log_cfg.enabled &&
         !overwriting_unreported_events)
     {
         overwriting_unreported_events = true;
-        esp_diag.error(REMOTELOG_OVERWRITING_UNREPORTED_EVENTS);
+        dia_error_evnt(REMOTELOG_OVERWRITING_UNREPORTED_EVENTS);
         ERROR("log_event overwriting not yet reported events");
     }
     // clear error when no longer overwriting reported events
     // but just on the first occurrence
     if ((event_sent[last_event_idx] == true) &&
-        remote_log_vars.enabled &&
+        remote_log_cfg.enabled &&
         overwriting_unreported_events)
     {
         overwriting_unreported_events = false;
-        esp_diag.info(REMOTELOG_NO_MORE_OVERWRITING_UNREPORTED_EVENTS);
+        dia_info_evnt(REMOTELOG_NO_MORE_OVERWRITING_UNREPORTED_EVENTS);
         INFO("log_event no longer overwriting not yet reported events");
     }
     event_sent[last_event_idx] = false;
@@ -391,24 +319,24 @@ static void comm_outcome(comm_res_type result)
     case success:
         if (comm_error_counter > 0)
         {
-            esp_diag.info(REMOTELOG_SERVER_AVAILABLE, comm_error_counter);
+            dia_info_evnt(REMOTELOG_SERVER_AVAILABLE, comm_error_counter);
         }
         comm_error_counter = 0;
         break;
     case host_not_reachable:
         if (comm_error_counter == 0)
-            esp_diag.info(REMOTELOG_SERVER_NOT_AVAILABLE, espclient->get_status());
+            dia_info_evnt(REMOTELOG_SERVER_NOT_AVAILABLE, espclient->get_status());
         comm_error_counter++;
         INFO("remote_log_post_info unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
         break;
     case host_bad_answer:
-        esp_diag.error(REMOTELOG_CHECK_ANSWER_UNEXPECTED_HOST_ANSWER, espclient->parsed_response->http_code);
+        dia_error_evnt(REMOTELOG_CHECK_ANSWER_UNEXPECTED_HOST_ANSWER, espclient->parsed_response->http_code);
         ERROR("remote_log_check_answer unexpected host answer %d, %s", espclient->parsed_response->http_code, espclient->parsed_response->body);
         espclient->disconnect(NULL, NULL);
         break;
     case host_req_error:
-        esp_diag.info(REMOTELOG_SERVER_DIDNT_ANSWER, espclient->get_status());
+        dia_info_evnt(REMOTELOG_SERVER_DIDNT_ANSWER, espclient->get_status());
         INFO("remote_log_check_answer unexpected webclient status %d", espclient->get_status());
         espclient->disconnect(NULL, NULL);
         break;
@@ -424,7 +352,7 @@ static void check_answer(void *param)
     ALL("remote_log_check_answer");
     switch (espclient->get_status())
     {
-    case WEBCLNT_RESPONSE_READY:
+    case HTTP_CLT_RESPONSE_READY:
         if (espclient->parsed_response->http_code != HTTP_OK)
         {
             // POST failed
@@ -466,8 +394,8 @@ static void post_info(void *param)
     ALL("remote_log_post_info");
     switch (espclient->get_status())
     {
-    case WEBCLNT_CONNECTED:
-    case WEBCLNT_RESPONSE_READY:
+    case HTTP_CLT_CONNECTED:
+    case HTTP_CLT_RESPONSE_READY:
     {
         comm_outcome(success);
 
@@ -483,31 +411,31 @@ static void post_info(void *param)
         TRACE("remote_log_post_info event str: %s", event_str);
 
         // "POST  HTTP/1.1rnHost: 111.111.111.111rnContent-Type: application/jsonrnAccept: */*rnConnection: keep-alivernContent-Length: 48rnrn{"timestamp":4294967295,"type":1,"value":-1234}rn"
-        int msg_len = 179 + os_strlen(remote_log_vars.path);
-        Heap_chunk msg(msg_len);
-        if (msg.ref == NULL)
+        int msg_len = 179 + os_strlen(remote_log_cfg.path);
+        char *msg = new char[msg_len];
+        if (msg == NULL)
         {
-            esp_diag.error(REMOTELOG_POST_INFO_HEAP_EXHAUSTED, msg_len);
+            dia_error_evnt(REMOTELOG_POST_INFO_HEAP_EXHAUSTED, msg_len);
             ERROR("remote_log_post_info - heap exausted [%d]", msg_len);
             espclient->disconnect(NULL, NULL);
             break;
         }
-        fs_sprintf(msg.ref,
+        fs_sprintf(msg,
                    "POST %s HTTP/1.1\r\n"
                    "Host: %s\r\n"
                    "Content-Type: application/json\r\n",
-                   remote_log_vars.path,
-                   remote_log_vars.host);
-        fs_sprintf((msg.ref + os_strlen(msg.ref)),
+                   remote_log_cfg.path,
+                   remote_log_cfg.host);
+        fs_sprintf((msg + os_strlen(msg)),
                    "Accept: */*\r\n"
                    "Connection: keep-alive\r\n"
                    "Content-Length: %d\r\n\r\n"
                    "%s\r\n",
                    os_strlen(event_str),
                    event_str);
-        TRACE("remote_log_post_info POSTing str: %s", msg.ref);
+        TRACE("remote_log_post_info POSTing str: %s", msg);
         TRACE("remote_log_post_info event %d was sent", event_idx);
-        espclient->send_req(msg.ref, os_strlen(msg.ref), check_answer, (void *)event_idx);
+        espclient->send_req(msg, os_strlen(msg), check_answer, (void *)event_idx);
     }
     break;
     default:
@@ -520,19 +448,19 @@ void send_events_to_external_host(void)
 {
     ALL("send_events_to_external_host");
 
-    if (!remote_log_vars.enabled)
+    if (!remote_log_cfg.enabled)
         return;
-    if (!Wifi::is_connected())
+    if (!espwifi_is_connected())
         return;
     struct ip_addr host_ip;
-    atoipaddr(&host_ip, remote_log_vars.host);
+    atoipaddr(&host_ip, remote_log_cfg.host);
 
     int event_idx = get_next_event_to_be_sent();
     TRACE("send_events_to_external_host event to be sent: %d", event_idx);
     if (event_idx < 0)
         // there are no unsent events
         return;
-    espclient->connect(host_ip, remote_log_vars.port, post_info, (void *)event_idx);
+    espclient->connect(host_ip, remote_log_cfg.port, post_info, (void *)event_idx);
 }
 
 void print_last_events(void)

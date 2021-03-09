@@ -25,9 +25,7 @@ int get_temp(int idx);
 int get_humi(int idx);
 
 // readings calibration offsets
-void set_cal_offset(int temp_offset, int humi_offset);
-int get_temp_cal_offset(void);
-int get_humi_cal_offset(void);
-
+int set_cal_offset(int temp_offset, int humi_offset);
+char *temp_log_cfg_json_stringify(char *dest = NULL, int len = 0);
 
 #endif

@@ -11,283 +11,183 @@
 extern "C"
 {
 #include "mem.h"
+#include "espbot_mem_macros.h"
 }
 
-#include "espbot_config.hpp"
-#include "espbot_global.hpp"
+#include "espbot_cfgfile.hpp"
+#include "espbot_diagnostic.hpp"
 #include "espbot_json.hpp"
 #include "espbot_list.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
 #include "app.hpp"
 #include "app_event_codes.h"
 #include "app_temp_ctrl_program.hpp"
 
-static void save_prgm_list(void);
-
 List<struct prgm_headings> *program_lst;
 
 // CRTL settings management
 
-#define PRG_LIST_FILENAME f_str("program_list.cfg")
+#define PRG_LIST_FILENAME ((char *)f_str("program_list.cfg"))
 
-static bool restore_prgm_list(void)
+static int prg_list_restore(void)
 {
-    ALL("temp_control_restore_prgm_list");
-    if (!espfs.is_available())
+    ALL("prg_list_restore");
+    if (!Espfile::exists(PRG_LIST_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(PRG_LIST_FILENAME);
+    JSONP_ARRAY prg_headings = cfgfile.getArray(f_str("prg_headings"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_FS_NOT_AVAILABLE);
-        ERROR("temp_control_restore_prgm_list FS not available");
-        return false;
+        dia_error_evnt(CTRL_PRG_LIST_RESTORE_ERROR);
+        ERROR("prg_list_restore error");
+        return CFG_error;
     }
-    File_to_json cfgfile(PRG_LIST_FILENAME);
-    if (!cfgfile.exists())
-        return false;
-
-    // prg_count
-    if (cfgfile.find_string(f_str("prg_count")))
-    {
-        esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE);
-        ERROR("temp_control_restore_prgm_list cannot find \"prg_count\"");
-        return false;
-    }
-    int prg_count = atoi(cfgfile.get_value());
-
-    // prg_headings
-    if (cfgfile.find_string(f_str("prg_headings")))
-    {
-        esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE);
-        ERROR("temp_control_restore_prgm_list cannot find \"prg_headings\"");
-        return false;
-    }
-    Json_array_str prg_array(cfgfile.get_value(), os_strlen(cfgfile.get_value()));
-    if ((prg_array.syntax_check() != JSON_SINTAX_OK) || (prg_array.size() != prg_count))
-    {
-        esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE);
-        ERROR("temp_control_restore_prgm_list incorrect array sintax");
-        return false;
-    }
-
     int idx;
-    for (idx = 0; idx < prg_count; idx++)
+    for (idx = 0; idx < prg_headings.len(); idx++)
     {
-        if ((prg_array.get_elem(idx) == NULL) || (prg_array.get_elem_type(idx) != JSON_OBJECT))
+        if (idx >= MAX_PROGRAM_COUNT)
+            break;
+        JSONP heading = prg_headings.getObj(idx);
+        if (heading.getErr() != JSON_noerr)
         {
-            esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE, idx);
-            ERROR("temp_control_restore_prgm_list array[%d] bad sintax", idx);
-            return false;
+            dia_error_evnt(CTRL_PRG_LIST_RESTORE_ERROR);
+            ERROR("prg_list_restore error");
+            return CFG_error;
         }
-        Json_str heading(prg_array.get_elem(idx), prg_array.get_elem_len(idx));
-        if (heading.find_pair(f_str("id")) != JSON_NEW_PAIR_FOUND)
+        int id = heading.getInt(f_str("id"));
+        char desc[32];
+        os_memset(desc, 0, 32);
+        heading.getStr(f_str("desc"), desc, 32);
+        if (heading.getErr() != JSON_noerr)
         {
-            esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE, idx);
-            ERROR("temp_control_restore_prgm_list array[%d] bad sintax", idx);
-            return false;
-        }
-        if (heading.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE, idx);
-            ERROR("temp_control_restore_prgm_list array[%d] bad sintax", idx);
-            return false;
-        }
-        int tmp_id = atoi(heading.get_cur_pair_value());
-        if (heading.find_pair(f_str("desc")) != JSON_NEW_PAIR_FOUND)
-        {
-            esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE, idx);
-            ERROR("temp_control_restore_prgm_list array[%d] bad sintax", idx);
-            return false;
-        }
-        if (heading.get_cur_pair_value_type() != JSON_STRING)
-        {
-            esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_INCOMPLETE, idx);
-            ERROR("temp_control_restore_prgm_list array[%d] bad sintax", idx);
-            return false;
+            dia_error_evnt(CTRL_PRG_LIST_RESTORE_ERROR);
+            ERROR("prg_list_restore error");
+            return CFG_error;
         }
         struct prgm_headings *heading_el = new struct prgm_headings;
         if (heading_el == NULL)
         {
-            esp_diag.error(TEMP_CTRL_RESTORE_PRGM_LIST_HEAP_EXHAUSTED, sizeof(struct prgm_headings));
-            ERROR("temp_control_restore_prgm_list array[%d] bad sintax", sizeof(struct prgm_headings));
-            return false;
+            dia_error_evnt(CTRL_PRG_LIST_RESTORE_HEAP_EXHAUSTED, sizeof(struct prgm_headings));
+            ERROR("temp_control_restore_prgm_list array[%d] bad syntax", sizeof(struct prgm_headings));
+            return CFG_error;
         }
-        heading_el->id = tmp_id;
-        int max_len = heading.get_cur_pair_value_len();
-        if (max_len > 31)
-            max_len = 31;
-        os_strncpy(heading_el->desc, heading.get_cur_pair_value(), max_len);
+        heading_el->id = id;
+        os_strncpy(heading_el->desc, desc, 31);
         program_lst->push_back(heading_el);
     }
-    espmem.stack_mon();
-    return true;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
-static bool saved_prgm_list_not_updated(void)
+static int prg_list_saved_updated(void)
 {
-    ALL("temp_control_saved_prgm_list_not_updated");
-    if (!espfs.is_available())
-    {
-        esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_FS_NOT_AVAILABLE);
-        ERROR("temp_control_saved_prgm_list_not_updated FS not available");
-        return true;
-    }
-    File_to_json cfgfile(PRG_LIST_FILENAME);
-    if (!cfgfile.exists())
-        return true;
-
-    // prg_count
-    if (cfgfile.find_string(f_str("prg_count")))
-    {
-        esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE);
-        ERROR("temp_control_saved_prgm_list_not_updated cannot find \"prg_count\"");
-        return true;
-    }
-    if (program_lst->size() != atoi(cfgfile.get_value()))
-        return true;
-
-    // prg_headings
-    if (cfgfile.find_string(f_str("prg_headings")))
-    {
-        esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE);
-        ERROR("temp_control_saved_prgm_list_not_updated cannot find \"prg_headings\"");
-        return true;
-    }
-    Json_array_str prg_array(cfgfile.get_value(), os_strlen(cfgfile.get_value()));
-    if ((prg_array.syntax_check() != JSON_SINTAX_OK) || (prg_array.size() != program_lst->size()))
-    {
-        esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE);
-        ERROR("temp_control_saved_prgm_list_not_updated incorrect array sintax");
-        return true;
-    }
-
+    ALL("prg_list_saved_updated");
+    Cfgfile cfgfile(PRG_LIST_FILENAME);
+    JSONP_ARRAY prg_headings = cfgfile.getArray(f_str("prg_headings"));
+    if (cfgfile.getErr() != JSON_noerr)
+        return CFG_error;
+    if (program_lst->size() != prg_headings.len())
+        return CFG_notUpdated;
     struct prgm_headings *cur_heading = program_lst->front();
     int idx;
-    for (idx = 0; idx < program_lst->size(); idx++)
+    for (idx = 0; idx < prg_headings.len(); idx++)
     {
-        if ((prg_array.get_elem(idx) == NULL) || (prg_array.get_elem_type(idx) != JSON_OBJECT))
-        {
-            // don't rise any error, just say cfg not updated...
-            // esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE, idx);
-            // ERROR("temp_control_saved_prgm_list_not_updated array[%d] bad sintax", idx);
-            return true;
-        }
-        Json_str heading(prg_array.get_elem(idx), prg_array.get_elem_len(idx));
-        if (heading.find_pair(f_str("id")) != JSON_NEW_PAIR_FOUND)
-        {
-            esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE, idx);
-            ERROR("temp_control_saved_prgm_list_not_updated array[%d] bad sintax", idx);
-            return true;
-        }
-        if (heading.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE, idx);
-            ERROR("temp_control_saved_prgm_list_not_updated array[%d] bad sintax", idx);
-            return true;
-        }
-        int tmp_id = atoi(heading.get_cur_pair_value());
-        if (heading.find_pair(f_str("desc")) != JSON_NEW_PAIR_FOUND)
-        {
-            esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE, idx);
-            ERROR("temp_control_saved_prgm_list_not_updated array[%d] bad sintax", idx);
-            return false;
-        }
-        if (heading.get_cur_pair_value_type() != JSON_STRING)
-        {
-            esp_diag.error(TEMP_CTRL_SAVED_PRGM_LIST_NOT_UPDATED_INCOMPLETE, idx);
-            ERROR("temp_control_saved_prgm_list_not_updated array[%d] bad sintax", idx);
-            return false;
-        }
+        if (idx >= MAX_PROGRAM_COUNT)
+            break;
+        JSONP heading = prg_headings.getObj(idx);
+        if (heading.getErr() != JSON_noerr)
+            return CFG_error;
+        int id = heading.getInt(f_str("id"));
+        char desc[32];
+        os_memset(desc, 0, 32);
+        heading.getStr(f_str("desc"), desc, 32);
+        if (heading.getErr() != JSON_noerr)
+            return CFG_error;
         if (cur_heading == NULL)
-            return true;
-        if ((cur_heading->id != tmp_id) || (os_strncmp(cur_heading->desc, heading.get_cur_pair_value(), 31)))
-            return true;
+            return CFG_notUpdated;
+        if ((cur_heading->id != id) || (os_strncmp(cur_heading->desc, desc, 31)))
+            return CFG_notUpdated;
         cur_heading = program_lst->next();
     }
-    espmem.stack_mon();
-    return false;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
-static void remove_prgm_list(void)
+char *prg_list_json_stringify(char *dest, int len)
 {
-    ALL("remove_prgm_list");
-    if (!espfs.is_available())
+    // {
+    //     "prg_headings": [
+    //         {"id": 1,"desc":"first"},
+    //         {"id": 2,"desc":"second"},
+    //         {"id": 3,"desc":"third"}
+    //     ]
+    // }
+    // {"prg_headings":[]}
+    // {"id":,"desc":""},
+    int msg_len = 19 + (program_lst->size() * (18 + 2 + 31)) + 1;
+    char *msg;
+    if (dest == NULL)
     {
-        esp_diag.error(TEMP_CTRL_REMOVE_PRGM_LIST_FS_NOT_AVAILABLE);
-        ERROR("remove_prgm_list FS not available");
-        return;
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(CTRL_PRG_LIST_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("prg_list_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
     }
-    if (Ffile::exists(&espfs, (char *)PRG_LIST_FILENAME))
-    {
-        Ffile cfgfile(&espfs, (char *)PRG_LIST_FILENAME);
-        cfgfile.remove();
-    }
-}
-
-static void save_prgm_list(void)
-{
-    ALL("save_prgm_list");
-    if (program_lst->size() == 0)
-    {
-        remove_prgm_list();
-        return;
-    }
-    if (saved_prgm_list_not_updated())
-        remove_prgm_list();
     else
-        return;
-    if (!espfs.is_available())
     {
-        esp_diag.error(TEMP_CTRL_SAVE_PRGM_LIST_FS_NOT_AVAILABLE);
-        ERROR("save_prgm_list FS not available");
-        return;
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
     }
-    Ffile cfgfile(&espfs, (char *)PRG_LIST_FILENAME);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(TEMP_CTRL_SAVE_PRGM_LIST_CANNOT_OPEN_FILE);
-        ERROR("save_prgm_list cannot open %s", PRG_LIST_FILENAME);
-        return;
-    }
-
-    {
-        //  {"prg_count":,"prg_headings":[
-        char buffer[(33 + 1 + 2)];
-        fs_sprintf(buffer,
-                   "{\"prg_count\":%d,\"prg_headings\":[",
-                   program_lst->size());
-        cfgfile.n_append(buffer, os_strlen(buffer));
-        espmem.stack_mon();
-    }
+    fs_sprintf(msg, "{\"prg_headings\":[");
     int idx;
     bool first_time = true;
     struct prgm_headings *cur_heading = program_lst->front();
     for (idx = 0; idx < program_lst->size(); idx++)
     {
         //  ,{"id":,"desc":""}
-        char buffer[(18 + 1 + 2 + 31)];
         if (first_time)
         {
             first_time = false;
-            fs_sprintf(buffer,
-                       "{\"id\": %d,\"desc\":\"%s\"}",
+            fs_sprintf(msg + os_strlen(msg),
+                       "{\"id\":%d,\"desc\":\"%s\"}",
                        cur_heading->id,
                        cur_heading->desc);
         }
         else
-            fs_sprintf(buffer,
-                       ",{\"id\": %d,\"desc\":\"%s\"}",
+            fs_sprintf(msg + os_strlen(msg),
+                       ",{\"id\":%d,\"desc\":\"%s\"}",
                        cur_heading->id,
                        cur_heading->desc);
-
-        cfgfile.n_append(buffer, os_strlen(buffer));
         cur_heading = program_lst->next();
-        espmem.stack_mon();
     }
-    {
-        //  ]}
-        char buffer[(2 + 1)];
-        fs_sprintf(buffer, "]}");
-        cfgfile.n_append(buffer, os_strlen(buffer));
-        espmem.stack_mon();
-    }
+    fs_sprintf(msg + os_strlen(msg), "]}");
+    mem_mon_stack();
+    return msg;
+}
+
+int prg_list_save(void)
+{
+    ALL("prg_list_save");
+    if (prg_list_saved_updated() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(PRG_LIST_FILENAME);
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char *str = prg_list_json_stringify();
+    int res = cfgfile.n_append(str, os_strlen(str));
+    delete str;
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
 // PROGRAM LIST
@@ -306,10 +206,10 @@ void init_program_list(void)
 
     program_lst = new List<struct prgm_headings>(MAX_PROGRAM_COUNT, delete_content);
 
-    if (!restore_prgm_list())
+    if (prg_list_restore() != CFG_ok)
     {
         // CTRL DEFAULT
-        esp_diag.warn(TEMP_CTRL_INIT_DEFAULT_PRGM_LIST);
+        dia_warn_evnt(CTRL_PRG_INIT_DEFAULT_PRGM_LIST);
         WARN("init_program_list no program available");
     }
 }
@@ -327,7 +227,6 @@ void delete_program(struct prgm *prog_ptr)
 // {
 //     "id": 1,
 //     "min_temp": 100,
-//     "period_count": 3,
 //     "periods": [
 //         {"wd": 8,"b":1880,"e":1880,"sp":200},
 //         {"wd": 8,"b":1880,"e":1880,"sp":200},
@@ -335,13 +234,13 @@ void delete_program(struct prgm *prog_ptr)
 //     ]
 // }
 
-struct prgm *load_program(int prg_id)
+int load_program(int prg_id, struct prgm *prg)
 {
     if (program_lst->size() == 0)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_NO_PROGRAM_LIST);
+        dia_error_evnt(CTRL_PRG_LOAD_NO_PROGRAM_LIST);
         ERROR("load_program no program list");
-        return NULL;
+        return ERR_PRG_NOT_FOUND;
     }
     // search for program id
     bool program_not_found = true;
@@ -358,186 +257,90 @@ struct prgm *load_program(int prg_id)
     // check if a program was found
     if (program_not_found)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_NO_PROGRAM_ID, prg_id);
+        dia_error_evnt(CTRL_PRG_LOAD_NO_PROGRAM_ID, prg_id);
         ERROR("load_program no program id %d", prg_id);
-        return NULL;
+        return ERR_PRG_NOT_FOUND;
     }
     char filename[32];
     os_memset(filename, 0, 32);
     fs_snprintf(filename, 31, "program_%d.prg", prg_id);
-
-    // os_strncpy(filename, cur_heading->desc, 31);
-    // // replace all chars different by letters or numbers with '_'
-    // int count;
-    // for (count = 0; count < 32; count++)
-    // {
-    //     if (('0' <= filename[count]) && (filename[count] <= '9') ||
-    //         ('A' <= filename[count]) && (filename[count] <= 'Z') ||
-    //         ('a' <= filename[count]) && (filename[count] <= 'z') ||
-    //         (filename[count] == 0))
-    //         continue;
-    //     else
-    //         filename[count] = '_';
-    // }
-
     TRACE("load_program filename %s", filename);
-    // now look for file
-    if (!espfs.is_available())
+    Cfgfile cfgfile(filename);
+    int id = cfgfile.getInt(f_str("id"));
+    int min_temp = cfgfile.getInt(f_str("min_temp"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_FS_NOT_AVAILABLE);
-        ERROR("load_program FS not available");
-        return NULL;
+        dia_error_evnt(CTRL_PRG_LOAD_BAD_SYNTAX);
+        ERROR("load_program error");
+        return ERR_PRG_BAD_SYNTAX;
     }
-    File_to_json cfgfile(filename);
-    if (!cfgfile.exists())
+    if (prg_id != id)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_CANNOT_OPEN_FILE);
-        ERROR("load_program cannot open %s", filename);
-        return NULL;
+        dia_error_evnt(CTRL_PRG_LOAD_BAD_SYNTAX);
+        ERROR("load_program wrong id \"id\"", id);
+        return ERR_PRG_BAD_SYNTAX;
     }
-    // id
-    if (cfgfile.find_string(f_str("id")))
+    JSONP_ARRAY periods = cfgfile.getArray(f_str("periods"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
-        ERROR("load_program cannot find \"id\"");
-        return NULL;
-    }
-    int tmp_id = atoi(cfgfile.get_value());
-    if (prg_id != tmp_id)
-    {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
-        ERROR("load_program wrong id \"id\"", atoi(cfgfile.get_value()));
-        return NULL;
-    }
-    // min_temp
-    if (cfgfile.find_string(f_str("min_temp")))
-    {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
-        ERROR("load_program cannot find \"min_temp\"");
-        return NULL;
-    }
-    int tmp_min_temp = atoi(cfgfile.get_value());
-
-    // period_count
-    if (cfgfile.find_string(f_str("period_count")))
-    {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
-        ERROR("load_program cannot find \"period_count\"");
-        return NULL;
-    }
-    int tmp_period_count = atoi(cfgfile.get_value());
-
-    // periods
-    if (cfgfile.find_string(f_str("periods")))
-    {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
+        dia_error_evnt(CTRL_PRG_LOAD_BAD_SYNTAX);
         ERROR("load_program cannot find \"periods\"");
-        return NULL;
+        return ERR_PRG_BAD_SYNTAX;
     }
-    Json_array_str tmp_periods(cfgfile.get_value(), os_strlen(cfgfile.get_value()));
-
-    if ((tmp_periods.syntax_check() != JSON_SINTAX_OK) || (tmp_periods.size() != tmp_period_count))
+    prg = new struct prgm;
+    if (prg == NULL)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE);
-        ERROR("load_program incorrect array sintax");
-        return NULL;
-    }
-
-    struct prgm *new_prg = new struct prgm;
-    if (new_prg == NULL)
-    {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_HEAP_EXHAUSTED, sizeof(struct prgm));
+        dia_error_evnt(CTRL_PRG_LOAD_HEAP_EXHAUSTED, sizeof(struct prgm));
         ERROR("load_program heap exhausted %d", sizeof(struct prgm));
-        return NULL;
+        return ERR_MEM_EXHAUSTED;
     }
-    new_prg->id = prg_id;
-    new_prg->min_temp = tmp_min_temp;
-    new_prg->period_count = tmp_period_count;
+    prg->id = id;
+    prg->min_temp = min_temp;
+    prg->period_count = periods.len();
     // there are no period in the program
-    if (new_prg->period_count == 0)
-        return new_prg;
+    if (prg->period_count == 0)
+        return id;
     // there are periods in the program
-    new_prg->periods = new struct prgm_period[tmp_period_count];
-    if (new_prg->periods == NULL)
+    if (prg->period_count > MAX_PROGRAM_PERIODS)
     {
-        esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_HEAP_EXHAUSTED, sizeof(struct prgm_period[tmp_period_count]));
-        ERROR("load_program heap exhausted %d", sizeof(struct prgm_period[tmp_period_count]));
-        return NULL;
+        dia_error_evnt(CTRL_PRG_LOAD_BAD_SYNTAX);
+        ERROR("load_program too many periods");
+        return ERR_PRG_BAD_SYNTAX;
+    }
+    prg->periods = new struct prgm_period[prg->period_count];
+    if (prg->periods == NULL)
+    {
+        dia_error_evnt(CTRL_PRG_LOAD_HEAP_EXHAUSTED, sizeof(struct prgm_period[prg->period_count]));
+        ERROR("load_program heap exhausted %d", sizeof(struct prgm_period[prg->period_count]));
+        return ERR_MEM_EXHAUSTED;
     }
     int count;
-    for (count = 0; count < tmp_period_count; count++)
+    for (count = 0; count < prg->period_count; count++)
     {
-        if ((tmp_periods.get_elem(count) == NULL) || (tmp_periods.get_elem_type(count) != JSON_OBJECT))
+        JSONP period = periods.getObj(count);
+        if (periods.getErr() != JSON_noerr)
         {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
+            dia_error_evnt(CTRL_PRG_LOAD_BAD_SYNTAX);
+            ERROR("load_program cannot find period %d", count);
+            return ERR_PRG_BAD_SYNTAX;
         }
-        Json_str periods(tmp_periods.get_elem(count), tmp_periods.get_elem_len(count));
-        if (periods.find_pair(f_str("wd")) != JSON_NEW_PAIR_FOUND)
+        enum week_days wd = (enum week_days)period.getInt(f_str("wd"));
+        int b = period.getInt(f_str("b"));
+        int e = period.getInt(f_str("e"));
+        int sp = period.getInt(f_str("sp"));
+        if (period.getErr() != JSON_noerr)
         {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
+            dia_error_evnt(CTRL_PRG_LOAD_BAD_SYNTAX);
+            ERROR("load_program bad json syntax on period %d", count);
+            return ERR_PRG_BAD_SYNTAX;
         }
-        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        new_prg->periods[count].day_of_week = (week_days)atoi(periods.get_cur_pair_value());
-        if (periods.find_pair(f_str("b")) != JSON_NEW_PAIR_FOUND)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        new_prg->periods[count].mm_start = (week_days)atoi(periods.get_cur_pair_value());
-        if (periods.find_pair(f_str("e")) != JSON_NEW_PAIR_FOUND)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        new_prg->periods[count].mm_end = (week_days)atoi(periods.get_cur_pair_value());
-        if (periods.find_pair(f_str("sp")) != JSON_NEW_PAIR_FOUND)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        if (periods.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            esp_diag.error(TEMP_CTRL_LOAD_PROGRAM_PRGM_INCOMPLETE, count);
-            ERROR("load_program array[%d] bad sintax", count);
-            delete_program(new_prg);
-            return NULL;
-        }
-        new_prg->periods[count].setpoint = (week_days)atoi(periods.get_cur_pair_value());
+        prg->periods[count].day_of_week = wd;
+        prg->periods[count].mm_start = b;
+        prg->periods[count].mm_end = e;
+        prg->periods[count].setpoint = sp;
     }
-    espmem.stack_mon();
-    return new_prg;
+    mem_mon_stack();
+    return id;
 }
 
 char *get_cur_program_name(int id)
@@ -555,65 +358,53 @@ char *get_cur_program_name(int id)
         return (char *)f_str("none");
 }
 
-static bool save_program(struct prgm *prg)
+char *program_json_stringify(struct prgm *prg, char *dest, int len)
 {
-    char filename[32];
-    os_memset(filename, 0, 32);
-    fs_snprintf(filename, 31, "program_%d.prg", prg->id);
-
-    TRACE("save_program filename %s", filename);
-    // now look for file
-    if (!espfs.is_available())
-    {
-        esp_diag.error(TEMP_CTRL_SAVE_PRGM_FS_NOT_AVAILABLE);
-        ERROR("save_program FS not available");
-        return false;
-    }
-    if (Ffile::exists(&espfs, filename))
-    {
-        Ffile cfgfile(&espfs, filename);
-        cfgfile.remove();
-    }
-    Ffile cfgfile(&espfs, filename);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(TEMP_CTRL_SAVE_PRGM_CANNOT_OPEN_FILE);
-        ERROR("save_program cannot open %s", filename);
-        return false;
-    }
-
     // PROGRAM
     // {
     //     "id": 1,
     //     "min_temp": 100,
-    //     "period_count": 3,
     //     "periods": [
     //         {"wd": 8,"b":1880,"e":1880,"sp":200},
     //         {"wd": 8,"b":1880,"e":1880,"sp":200},
     //         {"wd": 8,"b":1880,"e":1880,"sp":200}
     //     ]
     // }
+    // {"id":,"min_temp":,"periods":[]}
+    // {"wd":,"b":,"e":,"sp":},
+    int msg_len = 32 + 2 + 6 + (prg->period_count * (24 + 1 + 4 + 4 + 6)) + 1;
+    char *msg;
+    if (dest == NULL)
     {
-        //  {"id": ,"min_temp": ,"period_count": ,"periods": [
-        char buffer[(50 + 1 + 2 + 5 + 5)];
-        fs_sprintf(buffer,
-                   "{\"id\": %d,\"min_temp\": %d,\"period_count\": %d,\"periods\": [",
-                   prg->id,
-                   prg->min_temp,
-                   prg->period_count);
-        cfgfile.n_append(buffer, os_strlen(buffer));
-        espmem.stack_mon();
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(CTRL_PRG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("program_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
     }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    fs_sprintf(msg,
+               "{\"id\":%d,\"min_temp\":%d,\"periods\":[",
+               prg->id,
+               prg->min_temp);
     int idx;
     bool first_time = true;
     for (idx = 0; idx < prg->period_count; idx++)
     {
-        //  ,{"wd":,"b":,"e":,"sp":}
-        char buffer[(24 + 1 + 1 + 4 + 4 + 5)];
         if (first_time)
         {
             first_time = false;
-            fs_sprintf(buffer,
+            fs_sprintf(msg + os_strlen(msg),
                        "{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
                        prg->periods[idx].day_of_week,
                        prg->periods[idx].mm_start,
@@ -621,24 +412,35 @@ static bool save_program(struct prgm *prg)
                        prg->periods[idx].setpoint);
         }
         else
-            fs_sprintf(buffer,
+            fs_sprintf(msg + os_strlen(msg),
                        ",{\"wd\":%d,\"b\":%d,\"e\":%d,\"sp\":%d}",
                        prg->periods[idx].day_of_week,
                        prg->periods[idx].mm_start,
                        prg->periods[idx].mm_end,
                        prg->periods[idx].setpoint);
+    }
+    fs_sprintf(msg + os_strlen(msg), "]}");
+    mem_mon_stack();
+    return msg;
+}
 
-        cfgfile.n_append(buffer, os_strlen(buffer));
-        espmem.stack_mon();
-    }
-    {
-        //  ]}
-        char buffer[(2 + 1)];
-        fs_sprintf(buffer, "]}");
-        cfgfile.n_append(buffer, os_strlen(buffer));
-        espmem.stack_mon();
-    }
-    return true;
+static int program_save(struct prgm *prg)
+{
+    char filename[32];
+    os_memset(filename, 0, 32);
+    fs_snprintf(filename, 31, "program_%d.prg", prg->id);
+
+    TRACE("program_save filename %s", filename);
+    Cfgfile cfgfile(filename);
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char *str = program_json_stringify(prg);
+    int res = cfgfile.n_append(str, os_strlen(str));
+    delete str;
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
 int add_program(char *name, struct prgm *prg)
@@ -668,22 +470,22 @@ int add_program(char *name, struct prgm *prg)
     // override program id
     prg->id = prg_id;
     // write program file
-    if (!save_program(prg))
+    if (program_save(prg) != CFG_ok)
         return ERR_SAVING_PRG;
     // add program heading
     struct prgm_headings *heading_ptr = new struct prgm_headings;
     if (heading_ptr == NULL)
     {
-        esp_diag.error(TEMP_CTRL_ADD_PRGM_HEAP_EXHAUSTED, sizeof(struct prgm_headings));
+        dia_error_evnt(CTRL_PRG_ADD_HEAP_EXHAUSTED, sizeof(struct prgm_headings));
         ERROR("add_program heap memory exhausted %d", sizeof(struct prgm_headings));
         return ERR_MEM_EXHAUSTED;
     }
     heading_ptr->id = prg_id;
     os_strncpy(heading_ptr->desc, name, 31);
     program_lst->push_back(heading_ptr);
-    if (saved_prgm_list_not_updated())
-        save_prgm_list();
-    espmem.stack_mon();
+    if (prg_list_save() != CFG_ok)
+        return ERR_SAVING_PRG;
+    mem_mon_stack();
     // return id
     return prg_id;
 }
@@ -701,14 +503,15 @@ int mod_program(int prg_id, char *name, struct prgm *prg)
     if (heading_ptr == NULL)
         return ERR_PRG_NOT_FOUND;
     os_strncpy(heading_ptr->desc, name, 31);
-    if (saved_prgm_list_not_updated())
-        save_prgm_list();
+
+    if (prg_list_save() != CFG_ok)
+        return ERR_SAVING_PRG;
     // override program id
     prg->id = prg_id;
     // write program file
-    if (!save_program(prg))
+    if (program_save(prg) != CFG_ok)
         return ERR_SAVING_PRG;
-    espmem.stack_mon();
+    mem_mon_stack();
     // return id
     return prg_id;
 }
@@ -720,19 +523,9 @@ int del_program(int prg_id)
     os_memset(filename, 0, 32);
     fs_snprintf(filename, 31, "program_%d.prg", prg_id);
     TRACE("del_program filename %s", filename);
-    if (espfs.is_available())
-    {
-        if (Ffile::exists(&espfs, filename))
-        {
-            Ffile cfgfile(&espfs, filename);
-            cfgfile.remove();
-        }
-    }
-    else
-    {
-        esp_diag.error(TEMP_CTRL_DEL_PRGM_FS_NOT_AVAILABLE);
-        ERROR("del_program FS not available");
-    }
+        Cfgfile cfgfile(filename);
+    if (cfgfile.remove() != SPIFFS_OK)
+        return CFG_error;
     // find the program id into the headings list
     struct prgm_headings *heading_ptr = program_lst->front();
     bool heading_found = false;
@@ -745,13 +538,13 @@ int del_program(int prg_id)
         }
         heading_ptr = program_lst->next();
     }
-    espmem.stack_mon();
+    mem_mon_stack();
     if (heading_found)
     {
         // return the program_id
         program_lst->remove();
-        if (saved_prgm_list_not_updated())
-            save_prgm_list();
+        if (prg_list_save() != CFG_ok)
+            return ERR_SAVING_PRG;
         return prg_id;
     }
     else

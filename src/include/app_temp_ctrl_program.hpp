@@ -28,6 +28,9 @@ struct prgm_headings
 };
 
 #define MAX_PROGRAM_COUNT 20
+#define MAX_PROGRAM_PERIODS 200
+
+#include "espbot_list.hpp"
 
 extern List<struct prgm_headings> *program_lst;
 
@@ -53,6 +56,7 @@ struct prgm
 #define ERR_SAVING_PRG (-2)                                //
 #define ERR_MEM_EXHAUSTED (-3)                             //
 #define ERR_PRG_NOT_FOUND (-4)                             //
+#define ERR_PRG_BAD_SYNTAX (-5)                            //
                                                            //
 int add_program(char *, struct prgm *);                    // return id or <0 if fails
 int del_program(int);                                      // return id or <0 if fails
@@ -61,7 +65,10 @@ int mod_program(int prg_id, char *name, struct prgm *prg); // return id or <0 if
 extern struct prgm *current_program;                       //
                                                            //
 char *get_cur_program_name(int);                           //
-struct prgm *load_program(int idx);                        //
+int load_program(int idx, struct prgm *prg);               // allocates memory on heap (prg)
 void delete_program(struct prgm *);                        // delete a struct prgm allocated on heap
+
+char *program_json_stringify(struct prgm *, char *dest = NULL, int len = 0);
+char *prg_list_json_stringify(char *dest = NULL, int len = 0);
 
 #endif

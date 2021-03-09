@@ -11,61 +11,32 @@
 extern "C"
 {
 #include "mem.h"
-#include "library_dio_task.h"
+#include "drivers_dio_task.h"
 #include "esp8266_io.h"
 }
 
-#include "espbot_config.hpp"
+#include "espbot.hpp"
+#include "espbot_cfgfile.hpp"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
-#include "espbot_global.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
 #include "app.hpp"
 #include "app_event_codes.h"
-#include "app_remote_log.hpp"
+#include "app_temp_log.hpp"
 #include "app_temp_control.hpp"
 #include "app_temp_log.hpp"
+#include "app_remote_log.hpp"
 
 static int temperature_log[TEMP_LOG_LENGTH];
 static int humidity_log[2];
 static char current_idx;
 static Dht *dht22;
-static int temp_cal_offset;
-static int humi_cal_offset;
-
-static bool restore_cfg(void);
-
-void temp_log_init(void)
+static struct
 {
-    ALL("temp_log_init");
-    // calibration offsets
-    if (restore_cfg())
-    {
-        esp_diag.info(TEMPLOG_CUSTOM_CAL_CFG);
-        INFO("temp_log_init custom calibration offsets found");
-    }
-    else
-    {
-        temp_cal_offset = 0;
-        humi_cal_offset = 0;
-        esp_diag.info(TEMPLOG_DEFAULT_CAL_CFG);
-        INFO("temp_log_init custom calibration offsets found");
-    }
-
-    // reading buffers
-    for (current_idx = 0; current_idx < TEMP_LOG_LENGTH; current_idx++)
-        temperature_log[current_idx] = INVALID_TEMP;
-    humidity_log[0] = INVALID_HUMI;
-    humidity_log[1] = INVALID_HUMI;
-    current_idx = 0;
-    // sensor class
-    dht22 = new Dht(DHT_DATA, DHT22, DHT_TEMP_ID, DHT_HUMI_ID, 0, DHT_BUFFERS);
-    if (dht22 == NULL)
-    {
-        esp_diag.error(TEMP_LOG_INIT_HEAP_EXHAUSTED);
-        ERROR("temp_log_init heap exhausted %d", sizeof(Dht));
-    }
-}
+    int temp_cal_offset;
+    int humi_cal_offset;
+} cal_cfg;
 
 // reading sensor results and logging locally and remotely
 static void dht_read_completed(void *param)
@@ -83,7 +54,7 @@ static void dht_read_completed(void *param)
         // keep the last temperature reading
         temperature_log[new_idx] = get_temp(current_idx);
     else
-        temperature_log[new_idx] = (int)(event.temperature * 10) + temp_cal_offset;
+        temperature_log[new_idx] = (int)(event.temperature * 10) + cal_cfg.temp_cal_offset;
     DEBUG("dht_read_completed temperature (*10): %d", temperature_log[new_idx]);
     current_idx++;
     if (current_idx >= TEMP_LOG_LENGTH)
@@ -92,7 +63,7 @@ static void dht_read_completed(void *param)
     // log temperature changes
     if (get_temp(0) != get_temp(1))
     {
-        struct date *current_time = get_current_time();
+        struct date *current_time = cron_get_current_time();
         log_event(current_time->timestamp, temp_change, get_temp(0));
     }
 
@@ -110,7 +81,7 @@ static void dht_read_completed(void *param)
         // rounding humidity reading
         // 67.5 -> 68.0
         // 68.4 -> 68.0
-        int humi_reading = (int)(event.relative_humidity * 10) + humi_cal_offset;
+        int humi_reading = (int)(event.relative_humidity * 10) + cal_cfg.humi_cal_offset;
         DEBUG("dht_read_completed humidity    (*10): %d", humi_reading);
         int int_humi = (humi_reading) / 10;
         int dec_humi = (humi_reading) % 10;
@@ -122,7 +93,7 @@ static void dht_read_completed(void *param)
     // log humidity changes
     if (get_humi(0) != get_humi(1))
     {
-        struct date *current_time = get_current_time();
+        struct date *current_time = cron_get_current_time();
         log_event(current_time->timestamp, humi_change, get_humi(0));
     }
 }
@@ -139,7 +110,7 @@ static void temp_log_read_completed(void *param)
 {
     ALL("temp_log_read_completed");
     dht_read_completed(NULL);
-    subsequent_function(temp_control_run);
+    next_function(temp_control_run);
 }
 
 // periodic temperature reading
@@ -173,140 +144,139 @@ int get_humi(int idx)
 
 // PERSISTENCY
 
-#define READING_CAL_FILENAME f_str("temp_log.cfg")
+#define TEMP_LOG_FILENAME ((char *)f_str("temp_log.cfg"))
+// {"temp_cal_offset":,"humi_cal_offset":}"
 
-static bool restore_cfg(void)
+static int temp_log_restore_cfg(void)
 {
     ALL("temp_log_restore_cfg");
-    if (!espfs.is_available())
+    if (!Espfile::exists(TEMP_LOG_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(TEMP_LOG_FILENAME);
+    int temp_cal_offset = cfgfile.getInt(f_str("temp_cal_offset"));
+    int humi_cal_offset = cfgfile.getInt(f_str("humi_cal_offset"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(TEMPLOG_RESTORE_CFG_FS_NOT_AVAILABLE);
-        ERROR("temp_log_restore_cfg FS not available");
-        return false;
+        dia_error_evnt(TEMPLOG_RESTORE_CFG_ERROR);
+        ERROR("temp_log_restore_cfg error");
+        return CFG_error;
     }
-    File_to_json cfgfile(READING_CAL_FILENAME);
-    if (cfgfile.exists())
-    {
-        // "{"temp_cal_offset":,"humi_cal_offset":}",
-        // temp_cal_offset
-        if (cfgfile.find_string(f_str("temp_cal_offset")))
-        {
-            esp_diag.error(TEMPLOG_RESTORE_CFG_INCOMPLETE);
-            ERROR("temp_log_restore_cfg cannot find \"temp_cal_offset\"");
-            return false;
-        }
-        // humi_cal_offset
-        temp_cal_offset = atoi(cfgfile.get_value());
-        if (cfgfile.find_string(f_str("humi_cal_offset")))
-        {
-            esp_diag.error(TEMPLOG_RESTORE_CFG_INCOMPLETE);
-            ERROR("temp_log_restore_cfg cannot find \"humi_cal_offset\"");
-            return false;
-        }
-        humi_cal_offset = atoi(cfgfile.get_value());
-        return true;
-    }
-    return false;
+    cal_cfg.temp_cal_offset = temp_cal_offset;
+    cal_cfg.humi_cal_offset = humi_cal_offset;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
-static bool saved_cfg_not_updated(void)
+static int temp_log_saved_cfg_updated(void)
 {
-    ALL("temp_log_saved_cfg_not_updated");
-    if (!espfs.is_available())
+    ALL("temp_log_saved_cfg_updated");
+    if (!Espfile::exists(TEMP_LOG_FILENAME))
     {
-        esp_diag.error(TEMPLOG_SAVED_CFG_NOT_UPDATED_FS_NOT_AVAILABLE);
-        ERROR("temp_log_saved_cfg_not_updated FS not available");
-        return true;
+        return CFG_notUpdated;
     }
-    File_to_json cfgfile(READING_CAL_FILENAME);
-    if (cfgfile.exists())
+    Cfgfile cfgfile(TEMP_LOG_FILENAME);
+    int temp_cal_offset = cfgfile.getInt(f_str("temp_cal_offset"));
+    int humi_cal_offset = cfgfile.getInt(f_str("humi_cal_offset"));
+    mem_mon_stack();
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        // "{"temp_cal_offset":,"humi_cal_offset":}",
-        // temp_cal_offset
-        if (cfgfile.find_string(f_str("temp_cal_offset")))
-        {
-            esp_diag.error(TEMPLOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("temp_log_saved_cfg_not_updated cannot find \"temp_cal_offset\"");
-            return true;
-        }
-        if (temp_cal_offset != atoi(cfgfile.get_value()))
-            return true;
-        // humi_cal_offset
-        if (cfgfile.find_string(f_str("humi_cal_offset")))
-        {
-            esp_diag.error(TEMPLOG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("temp_log_saved_cfg_not_updated cannot find \"humi_cal_offset\"");
-            return true;
-        }
-        if (humi_cal_offset != atoi(cfgfile.get_value()))
-            return true;
-        return false;
+        // no need to raise an error, the cfg file will be overwritten
+        // dia_error_evnt(TEMP_LOG_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("temp_log_saved_cfg_updated error");
+        return CFG_error;
     }
-    espmem.stack_mon();
-    return true;
+    if ((cal_cfg.temp_cal_offset != temp_cal_offset) ||
+        (cal_cfg.humi_cal_offset != humi_cal_offset))
+    {
+        return CFG_notUpdated;
+    }
+    return CFG_ok;
 }
 
-static void remove_cfg(void)
+char *temp_log_cfg_json_stringify(char *dest, int len)
 {
-    ALL("temp_log_remove_cfg");
-    if (!espfs.is_available())
+// {"temp_cal_offset":,"humi_cal_offset":}"
+    int msg_len = 40 + 6 + 6 + 1;
+    char *msg;
+    if (dest == NULL)
     {
-        esp_diag.error(TEMPLOG_REMOVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("temp_log_remove_cfg FS not available");
-        return;
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(TEMPLOG_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("temp_log_cfg_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
     }
-    if (Ffile::exists(&espfs, (char *)READING_CAL_FILENAME))
-    {
-        Ffile cfgfile(&espfs, (char *)READING_CAL_FILENAME);
-        cfgfile.remove();
-    }
-}
-
-static void save_cfg(void)
-{
-    ALL("temp_log_save_cfg");
-    if (saved_cfg_not_updated())
-        remove_cfg();
     else
-        return;
-    if (!espfs.is_available())
     {
-        esp_diag.error(TEMPLOG_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("temp_log_save_cfg FS not available");
-        return;
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
     }
-    Ffile cfgfile(&espfs, (char *)READING_CAL_FILENAME);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(TEMPLOG_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("temp_log_save_cfg cannot open %s", READING_CAL_FILENAME);
-        return;
-    }
-    // "{"temp_cal_offset":,"humi_cal_offset":}"
-    // int file_len = 39 + 6 + 6 + 1;
-    char buffer[52];
-    os_memset(buffer, 0, 52);
-    fs_sprintf(buffer,
+    fs_sprintf(msg,
                "{\"temp_cal_offset\":%d,\"humi_cal_offset\":%d}",
-               temp_cal_offset,
-               humi_cal_offset);
-    cfgfile.n_append(buffer, os_strlen(buffer));
-    espmem.stack_mon();
+               cal_cfg.temp_cal_offset,
+               cal_cfg.humi_cal_offset);
+    mem_mon_stack();
+    return msg;
 }
 
-void set_cal_offset(int temp_offset, int humi_offset)
+int temp_log_cfg_save(void)
 {
-    temp_cal_offset = temp_offset;
-    humi_cal_offset = humi_offset;
-    save_cfg();
+    ALL("temp_log_cfg_save");
+    if (temp_log_saved_cfg_updated() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(TEMP_LOG_FILENAME);
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char str[53];
+    temp_log_cfg_json_stringify(str, 53);
+    int res = cfgfile.n_append(str, os_strlen(str));
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    mem_mon_stack();
+    return CFG_ok;
 }
 
-int get_temp_cal_offset(void)
+int set_cal_offset(int temp_offset, int humi_offset)
 {
-    return temp_cal_offset;
+    cal_cfg.temp_cal_offset = temp_offset;
+    cal_cfg.humi_cal_offset = humi_offset;
+    return temp_log_cfg_save();
 }
 
-int get_humi_cal_offset(void)
+void temp_log_init(void)
 {
-    return humi_cal_offset;
+    ALL("temp_log_init");
+    // calibration offsets
+    if (temp_log_restore_cfg() != CFG_ok)
+    {
+        dia_info_evnt(TEMPLOG_CUSTOM_CAL_CFG);
+        INFO("temp_log_init custom calibration offsets found");
+    }
+    else
+    {
+        cal_cfg.temp_cal_offset = 0;
+        cal_cfg.humi_cal_offset = 0;
+        dia_info_evnt(TEMPLOG_DEFAULT_CAL_CFG);
+        INFO("temp_log_init custom calibration offsets found");
+    }
+
+    // reading buffers
+    for (current_idx = 0; current_idx < TEMP_LOG_LENGTH; current_idx++)
+        temperature_log[current_idx] = INVALID_TEMP;
+    humidity_log[0] = INVALID_HUMI;
+    humidity_log[1] = INVALID_HUMI;
+    current_idx = 0;
+    // sensor class
+    dht22 = new Dht(DHT_DATA, DHT22, DHT_TEMP_ID, DHT_HUMI_ID, 0, DHT_BUFFERS);
+    if (dht22 == NULL)
+    {
+        dia_error_evnt(TEMPLOG_INIT_HEAP_EXHAUSTED);
+        ERROR("temp_log_init heap exhausted %d", sizeof(Dht));
+    }
 }

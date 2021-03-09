@@ -9,7 +9,7 @@
 #ifndef __APP_HPP__
 #define __APP_HPP__
 
-#include "library_dht.hpp"
+#include "drivers_dht.hpp"
 
 /*
  *  API_RELEASE is coming from the api yaml file version row
@@ -24,7 +24,7 @@
 void app_init_before_wifi(void);
 void app_init_after_wifi(void);
 void app_deinit_on_wifi_disconnect(void);
-uint32 get_last_reboot_date(void);
+char *app_info_json_stringify(char *dest = NULL, int len = 0);
 
 extern char *app_name;
 extern char *app_release;

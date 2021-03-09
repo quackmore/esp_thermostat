@@ -2,7 +2,7 @@ openapi: 3.0.0
 
 info:
   title: ESP_thermostat APIs
-  version: 2.1.1
+  version: 2.2.0
   description: >
     These APIs are for reading, setting and controlling ESP_thermostat APP.
     Based on ESPBOT API 
@@ -2155,7 +2155,7 @@ components:
       - app_version
       - espbot_version
       - api_version
-      - library_version
+      - drivers_version
       - sdk_version
       - boot_version
       properties:
@@ -2189,7 +2189,7 @@ components:
           pattern: '[ -~]{1,10}'
           minLength: 1
           maxLength: 10
-        library_version:
+        drivers_version:
           type: string
           pattern: '[ -~]{1,63}'
           minLength: 1

@@ -175,7 +175,7 @@ SECTIONS
     *libapp.a:(.literal .text .literal.* .text.*)
     *libdriver.a:(.literal .text .literal.* .text.*)
     *libespbot.a:(.literal .text .literal.* .text.*)
-    *liblibrary.a:(.literal .text .literal.* .text.*)
+    *libdrivers.a:(.literal .text .literal.* .text.*)
     *libspiffs.a:(.literal .text .literal.* .text.*)
     *libuser.a:(.literal .text .literal.* .text.*)
 

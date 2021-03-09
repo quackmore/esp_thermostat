@@ -11,13 +11,19 @@
 extern "C"
 {
 #include "mem.h"
-#include "library_dio_task.h"
+#include "osapi.h"
+#include "user_interface.h"
+#include "drivers_dio_task.h"
 #include "esp8266_io.h"
+#include "app_event_codes.h"
+#include "espbot_mem_macros.h"
 }
 
+#include "espbot.hpp"
 #include "espbot_cron.hpp"
-#include "espbot_global.hpp"
-#include "library_dht.hpp"
+#include "espbot_diagnostic.hpp"
+#include "drivers.hpp"
+#include "drivers_dht.hpp"
 #include "app.hpp"
 #include "app_remote_log.hpp"
 #include "app_heater.hpp"
@@ -78,4 +84,58 @@ void app_init_after_wifi(void)
 
 void app_deinit_on_wifi_disconnect()
 {
+}
+
+char *app_info_json_stringify(char *dest, int len)
+{
+   // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","api_version":"","drivers_version":"","sdk_version":"","boot_version":""}
+    int msg_len = 155 +
+                  os_strlen(espbot_get_name()) +
+                  10 +
+                  os_strlen(app_name) +
+                  os_strlen(app_release) +
+                  os_strlen(espbot_get_version()) +
+                  os_strlen(f_str(API_RELEASE)) +
+                  os_strlen(drivers_release) +
+                  os_strlen(system_get_sdk_version()) +
+                  10 +
+                  1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(APP_INFO_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("app_info_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    fs_sprintf(msg,
+               "{\"device_name\":\"%s\",\"chip_id\":\"%d\",\"app_name\":\"%s\",",
+               espbot_get_name(),
+               system_get_chip_id(),
+               app_name);
+    fs_sprintf((msg + os_strlen(msg)),
+               "\"app_version\":\"%s\",\"espbot_version\":\"%s\",",
+               app_release,
+               espbot_get_version());
+    fs_sprintf(msg + os_strlen(msg),
+               "\"api_version\":\"%s\",\"drivers_version\":\"%s\",",
+               f_str(API_RELEASE),
+               drivers_release);
+    fs_sprintf(msg + os_strlen(msg),
+               "\"sdk_version\":\"%s\",\"boot_version\":\"%d\"}",
+               system_get_sdk_version(),
+               system_get_boot_version());
+     return msg;
 }
