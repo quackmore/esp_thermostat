@@ -679,6 +679,8 @@ static void createProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     }
 
     int result = add_program(name, &program);
+    if (program.periods)
+        delete program.periods;
     switch (result)
     {
     case MAX_PRG_COUNT_REACHED:
@@ -765,8 +767,9 @@ static void updateProgram(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     {
         program.periods = NULL;
     }
-
     int result = mod_program(program_id, name, &program);
+    if (program.periods)
+        delete program.periods;
     switch (result)
     {
     case ERR_PRG_NOT_FOUND:
