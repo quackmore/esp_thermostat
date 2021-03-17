@@ -367,7 +367,7 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     header.m_content_type = HTTP_CONTENT_JSON;
     int ev_num = events_count();
     // calculate the effective content_len
-    int content_len = 18 + 1;
+    int content_len = 18;
     {
         int idx;
         char buffer[40];
@@ -383,6 +383,10 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
                            ev_i->value);
             content_len += os_strlen(buffer);
         }
+        // when events array is not empty
+        // subtract 1 comma (last array element)
+        if (content_len > 18)
+            content_len -= 1;
     }
     header.m_content_length = content_len;
     header.m_content_range_start = 0;
