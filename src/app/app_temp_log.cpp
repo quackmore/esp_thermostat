@@ -52,7 +52,7 @@ static void dht_read_completed(void *param)
         new_idx = 0;
     if (event.invalid)
         // keep the last temperature reading
-        temperature_log[new_idx] = get_temp(current_idx);
+        temperature_log[new_idx] = get_temp(0);
     else
         temperature_log[new_idx] = (int)(event.temperature * 10) + cal_cfg.temp_cal_offset;
     DEBUG("dht_read_completed temperature (*10): %d", temperature_log[new_idx]);
