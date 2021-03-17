@@ -359,7 +359,7 @@ static void getCtrlEvents_next(struct http_split_send *p_sr)
 void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
 {
     // {"ctrl_events":[]}
-    // {"ts":4294967295,"tp":1,"vl":-12345},
+    // {"ts":4294967295,"tp":1,"vl":-1234},
     ALL("getCtrlEvents_first");
     // let's start with the header
     Http_header header;
@@ -481,7 +481,7 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     else
     {
         // no need to split the content over multiple messages
-        char *buffer = new char[content_len];
+        char *buffer = new char[content_len + 1];
         if (buffer == NULL)
         {
             dia_error_evnt(APP_ROUTES_GETCTRLEVENTS_FIRST_HEAP_EXHAUSTED, content_len);
@@ -509,6 +509,7 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
         }
         fs_sprintf(buffer + os_strlen(buffer), "]}");
         TRACE("getctrlevents_first *p_espconn: %X, msg (full) len: %d", p_espconn, content_len);
+        TRACE("getctrlevents_first msg: %s", buffer);
         http_send_buffer(p_espconn, 1, buffer, os_strlen(buffer));
     }
 }
