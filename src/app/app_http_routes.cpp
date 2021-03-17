@@ -359,7 +359,7 @@ static void getCtrlEvents_next(struct http_split_send *p_sr)
 void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
 {
     // {"ctrl_events":[]}
-    // {"ts":4294967295,"tp":1,"vl":-1234},
+    // {"ts":4294967295,"tp":1,"vl":-12345},
     ALL("getCtrlEvents_first");
     // let's start with the header
     Http_header header;
@@ -367,10 +367,10 @@ void getCtrlEvents_first(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     header.m_content_type = HTTP_CONTENT_JSON;
     int ev_num = events_count();
     // calculate the effective content_len
-    int content_len = 18 - 1;
+    int content_len = 18 + 1;
     {
         int idx;
-        char buffer[37];
+        char buffer[40];
         struct activity_event *ev_i;
         for (idx = 0; idx < ev_num; idx++)
         {
